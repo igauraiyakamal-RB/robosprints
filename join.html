@@ -19,7 +19,7 @@
    if(!u)return null;
    const s=String(u).trim();
    const y=s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
-   if(y)return {type:"iframe",src:"https://www.youtube-nocookie.com/embed/"+y[1]+"?autoplay=0&rel=0"};
+   if(y)return {type:"iframe",src:"https://www.youtube-nocookie.com/embed/"+y[1]+"?autoplay=1&mute=1&playsinline=1&rel=0"};
    if(/\.mp4(?:$|[?#])/i.test(s))return {type:"video",src:s};
    return null;
  }
@@ -32,8 +32,8 @@
      if(!project)return;
      const v=embed(project.video||project.demo);
      box.innerHTML=v.type==="iframe"
-       ? '<iframe src="'+v.src+'" title="RoboSprints project demonstration" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'
-       : '<video controls playsinline preload="metadata"><source src="'+v.src+'" type="video/mp4">Your browser does not support video playback.</video>';
+       ? '<iframe src="'+v.src+'" title="RoboSprints project demonstration" loading="eager" allow="autoplay; accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'
+       : '<video autoplay muted loop controls playsinline preload="auto"><source src="'+v.src+'" type="video/mp4">Your browser does not support video playback.</video>';
      box.setAttribute("aria-label","Featured project video: "+(project.title||"RoboSprints project"));
    }catch(e){console.warn("Featured membership video could not be loaded",e);}
  }
