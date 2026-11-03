@@ -15,6 +15,9 @@
  const URL="https://ymndslqkhuubgoxxkuei.supabase.co";
  const KEY="sb_publishable_u9d-jX_yxaofcUIw1Ou6lg__GaE3sPa";
  const box=document.getElementById("membershipHeroVideo");
+ const params=new URLSearchParams(window.location.search);
+ const projectId=params.get("project");
+ const projectTitle=params.get("project_title");
  function embed(u){
    if(!u)return null;
    const s=String(u).trim();
@@ -25,17 +28,32 @@
  }
  async function load(){
    try{
-     const res=await fetch(URL+"/rest/v1/projects?select=title,video,demo&status=eq.published&order=created_at.desc&limit=10",{headers:{apikey:KEY,Authorization:"Bearer "+KEY}});
-     if(!res.ok)return;
+     if(!projectId&&!projectTitle)return;
+     const filter=projectId
+       ? "id=eq."+encodeURIComponent(projectId)
+       : "title=eq."+encodeURIComponent(projectTitle);
+     const res=await fetch(URL+"/rest/v1/projects?select=id,title,intro,video,demo&status=eq.published&"+filter,{headers:{apikey:KEY,Authorization:"Bearer "+KEY}});
+     if(!res.ok)throw Error("Could not load the selected project ("+res.status+")");
      const rows=await res.json();
-     const project=rows.find(p=>embed(p.video||p.demo));
-     if(!project)return;
+     const project=Array.isArray(rows)?rows[0]:null;
+     if(!project){
+       box.innerHTML='<div class="video-placeholder"><span>▶</span><b>Project not found</b><small>Please return to Projects and choose a published project.</small></div>';
+       return;
+     }
      const v=embed(project.video||project.demo);
-     box.innerHTML=v.type==="iframe"
-       ? '<iframe src="'+v.src+'" title="RoboSprints project demonstration" loading="eager" allow="autoplay; accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'
-       : '<video autoplay loop controls playsinline preload="auto"><source src="'+v.src+'" type="video/mp4">Your browser does not support video playback.</video>';
-     box.setAttribute("aria-label","Featured project video: "+(project.title||"RoboSprints project"));
-   }catch(e){console.warn("Featured membership video could not be loaded",e);}
+     if(!v){
+       box.innerHTML='<div class="video-placeholder"><span>▶</span><b>'+String(project.title||"Selected project").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))+'</b><small>Video demonstration will be added soon.</small></div>';
+     } else {
+       box.innerHTML=v.type==="iframe"
+         ? '<iframe src="'+v.src+'" title="'+String(project.title||"Project demonstration").replace(/"/g,"&quot;")+'" loading="eager" allow="autoplay; accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'
+         : '<video autoplay loop controls playsinline preload="auto"><source src="'+v.src+'" type="video/mp4">Your browser does not support video playback.</video>';
+     }
+     const title=project.title||"Selected project";
+     box.setAttribute("aria-label","Project video: "+title);
+     const slot=box.querySelector(".slot"); if(slot)slot.textContent=title.toUpperCase();
+     const foot=document.querySelector(".filmfoot b"); if(foot)foot.textContent=title;
+     document.title=title+" | Join RoboSprints";
+   }catch(e){console.warn("Selected project video could not be loaded",e);}
  }
  load();
 })();
