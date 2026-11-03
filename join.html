@@ -58,4 +58,31 @@
  load();
 })();
 </script>
-</body><footer><div class="wrap foot"><b>RoboSprints</b><span>BUILD · LEARN · GET RECOGNISED · GROW</span></div></footer></html>
+
+<script>\n// GUIDED AUTO SCROLL TO MEMBERSHIP PLANS
+(function(){
+  // Briefly show the selected project, then guide visitors to membership plans.
+  const params=new URLSearchParams(window.location.search);
+  const destination="/membership-plans.html"+(params.toString()?"?"+params.toString():"");
+  let started=false;
+  function guideToPlans(){
+    if(started)return;
+    started=true;
+    const start=window.scrollY;
+    const distance=Math.max(0,document.documentElement.scrollHeight-window.innerHeight-start);
+    const duration=400;
+    const began=performance.now();
+    function step(now){
+      const progress=Math.min(1,(now-began)/duration);
+      // Smooth ease-in-out movement over exactly 0.4 seconds.
+      const eased=progress<0.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
+      window.scrollTo(0,start+distance*eased);
+      if(progress<1)requestAnimationFrame(step);
+      else window.location.replace(destination);
+    }
+    requestAnimationFrame(step);
+  }
+  // Give the selected project heading/video a brief first look before the fast guided scroll.
+  window.addEventListener("load",function(){setTimeout(guideToPlans,900);},{once:true});
+})();
+</script></body><footer><div class="wrap foot"><b>RoboSprints</b><span>BUILD · LEARN · GET RECOGNISED · GROW</span></div></footer></html>
