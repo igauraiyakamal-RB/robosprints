@@ -18,9 +18,9 @@
  function embed(u){
    if(!u)return null;
    const s=String(u).trim();
-   const y=s.match(/(?:youtube\\.com\\/(?:watch\\?v=|embed\\/)|youtu\\.be\\/)([A-Za-z0-9_-]{6,})/);
+   const y=s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
    if(y)return {type:"iframe",src:"https://www.youtube-nocookie.com/embed/"+y[1]+"?autoplay=0&rel=0"};
-   if(/\\.mp4(?:$|[?#])/i.test(s))return {type:"video",src:s};
+   if(/\.mp4(?:$|[?#])/i.test(s))return {type:"video",src:s};
    return null;
  }
  async function load(){
