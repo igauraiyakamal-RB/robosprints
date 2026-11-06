@@ -60,6 +60,7 @@ document.getElementById("joinForm").addEventListener("submit",e=>{e.preventDefau
    localStorage.setItem('robosprints_membership_selection',JSON.stringify(data));
  }
  const oldChoose=choose; choose=function(card){oldChoose(card);saveSelection()};
+ const details=JSON.parse(localStorage.getItem('robosprints_membership_details')||'null');if(details){Object.entries(details).forEach(([k,v])=>{const e=document.querySelector('[name="'+k+'"]');if(e)e.value=v})}
  const saved=JSON.parse(localStorage.getItem('robosprints_membership_selection')||'null');
  if(saved){const card=cards.find(x=>x.dataset.plan===saved.plan);if(card)choose(card)}
  document.getElementById('joinForm').addEventListener('input',()=>{
