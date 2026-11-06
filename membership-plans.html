@@ -49,4 +49,21 @@ function choose(card){cards.forEach(c=>{c.classList.toggle("selected",c===card);
 cards.forEach(card=>{card.addEventListener("click",()=>choose(card));card.querySelector("button").addEventListener("click",e=>{e.stopPropagation();choose(card)})});
 document.getElementById("joinForm").addEventListener("submit",e=>{e.preventDefault();alert("Thank you. This is a preview only. Razorpay payment and account activation will be enabled after secure merchant credentials are configured.")});
 </script>
-</body></html>
+<script>
+/* Membership continuity: remember the project and selected subscription without activating payment. */
+(function(){
+ const q=new URLSearchParams(location.search),projectId=q.get('project');
+ const stored=JSON.parse(localStorage.getItem('robosprints_selected_project')||'null');
+ if(projectId)localStorage.setItem('robosprints_selected_project',JSON.stringify({...(stored||{}),id:projectId,selected_at:new Date().toISOString()}));
+ function saveSelection(){
+   const data={project_id:projectId||(stored&&stored.id)||null,plan:selected.name,price:selected.price,duration:selected.duration,updated_at:new Date().toISOString()};
+   localStorage.setItem('robosprints_membership_selection',JSON.stringify(data));
+ }
+ const oldChoose=choose; choose=function(card){oldChoose(card);saveSelection()};
+ const saved=JSON.parse(localStorage.getItem('robosprints_membership_selection')||'null');
+ if(saved){const card=cards.find(x=>x.dataset.plan===saved.plan);if(card)choose(card)}
+ document.getElementById('joinForm').addEventListener('input',()=>{
+   const f=new FormData(document.getElementById('joinForm'));localStorage.setItem('robosprints_membership_details',JSON.stringify(Object.fromEntries(f.entries())))
+ });
+})();
+</script></body></html>
