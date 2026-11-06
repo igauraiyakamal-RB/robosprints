@@ -94,4 +94,39 @@ async function loadParts(id){try{const rows=await api('/rest/v1/project_parts?se
 function addPart(p={}){const d=document.createElement('div');d.className='part';d.dataset.id=p.id||'';d.innerHTML='<input class="pn" placeholder="Part name" value="'+esc(p.name||'')+'"><input class="pd" placeholder="One-line description" value="'+esc(p.description||'')+'"><input class="pp" type="number" min="0" placeholder="Price" value="'+(p.price??'')+'"><button class="secondary" type="button">Remove</button>';d.querySelector('button').onclick=()=>d.remove();$('parts').appendChild(d)}
 $('addPart').onclick=()=>addPart();
 $('saveManager').onclick=async()=>{try{const id=$('editId').value,body={title:$('mTitle').value.trim(),level:$('mLevel').value.trim(),intro:$('mIntro').value.trim(),outcome:$('mOutcome').value.trim(),video:$('mVideo').value.trim(),status:$('mStatus').value};await api('/rest/v1/projects?id=eq.'+id,{method:'PATCH',body:JSON.stringify(body)});const old=await api('/rest/v1/project_parts?select=id&project_id=eq.'+id);for(const x of old)await api('/rest/v1/project_parts?id=eq.'+x.id,{method:'DELETE'});const parts=[...document.querySelectorAll('#parts .part')].map((d,i)=>({project_id:id,name:d.querySelector('.pn').value.trim(),description:d.querySelector('.pd').value.trim(),price:Number(d.querySelector('.pp').value||0),is_core:true,sort_order:i})).filter(x=>x.name);for(const part of parts)await api('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(part)});msg('appMsg','Project and parts saved successfully.','ok');await loadProjects()}catch(e){msg('appMsg',e.message,'error')}}
+</script><script>
+/* Independent login recovery: kept separate so the entry buttons work even if dashboard code changes. */
+(function(){
+const SB='https://ymndslqkhuubgoxxkuei.supabase.co';
+const KEY='sb_publishable_u9d-jX_yxaofcUIw1Ou6lg__GaE3sPa';
+const q=id=>document.getElementById(id);
+const show=(id,t,err)=>{const e=q(id);if(e){e.className='msg '+(err?'error':'ok');e.textContent=t;}};
+function openSignup(){q('loginBox').classList.add('hidden');q('forgotBox').classList.add('hidden');q('signupBox').classList.remove('hidden');}
+async function login(){
+ const email=q('email').value.trim(),password=q('password').value,b=q('loginBtn');
+ if(!email||!password){show('loginMsg','Please enter both email and password.',true);return;}
+ try{b.disabled=true;show('loginMsg','Signing in…');
+ const res=await fetch(SB+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+ const d=await res.json(); if(!res.ok)throw Error(d.error_description||d.msg||d.message||'Invalid email or password.');
+ sessionStorage.setItem('robosprints_mentor_token',d.access_token||'');
+ location.href='/mentor.html?session=active';
+ }catch(e){show('loginMsg','Login failed: '+e.message,true);}finally{b.disabled=false;}
+}
+async function signup(){
+ const name=q('signupName').value.trim(),email=q('signupEmail').value.trim(),phone=q('signupPhone').value.trim(),password=q('signupPassword').value,confirm=q('signupConfirm').value,b=q('signupBtn');
+ if(!name||!email||!password){show('signupMsg','Please enter your name, email and password.',true);return;}
+ if(password.length<6){show('signupMsg','Password must be at least 6 characters.',true);return;}
+ if(password!==confirm){show('signupMsg','Passwords do not match.',true);return;}
+ try{b.disabled=true;show('signupMsg','Submitting your registration request…');
+ const res=await fetch(SB+'/auth/v1/signup',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password,data:{full_name:name,phone,requested_role:'mentor'}})});
+ const d=await res.json();if(!res.ok)throw Error(d.msg||d.error_description||d.message||'Registration failed.');
+ show('signupMsg','Registration submitted successfully. Your account is awaiting Project Manager approval.',false);
+ }catch(e){show('signupMsg','Registration failed: '+e.message,true);}finally{b.disabled=false;}
+}
+q('loginBtn').onclick=e=>{e.preventDefault();login()};
+q('showSignup').onclick=e=>{e.preventDefault();openSignup()};
+q('signupBtn').onclick=e=>{e.preventDefault();signup()};
+q('backLogin').onclick=e=>{e.preventDefault();q('signupBox').classList.add('hidden');q('loginBox').classList.remove('hidden');};
+q('password').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();login();}};
+})();
 </script></body></html>
