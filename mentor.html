@@ -72,8 +72,12 @@ async function doPasswordLogin(){
     msg('loginMsg','Login failed: '+(e.message||'Please try again.'),'error');
   }finally{btn.disabled=false}
 }
-$('loginBtn').addEventListener('click',doPasswordLogin);
+// Keep the login action explicit and resilient on cached/mobile browsers.
+window.doPasswordLogin=doPasswordLogin;
+$('loginBtn').onclick=function(e){e.preventDefault();doPasswordLogin();return false};
+$('loginBtn').addEventListener('click',function(e){e.preventDefault();doPasswordLogin()});
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doPasswordLogin()}});
+document.addEventListener('DOMContentLoaded',()=>{const b=$('loginBtn');if(b)b.disabled=false});
 $('logout').onclick=()=>location.reload();
 async function loadStaffRequests(){try{const rows=await api('/rest/v1/'+PROFILE_TABLE+'?select=id,full_name,email,phone,requested_role,created_at&approval_status=eq.pending&requested_role=in.(mentor,project_manager)&order=created_at.desc');const box=$('staffRequests');box.innerHTML=rows.length?rows.map(x=>'<div class="project"><div class="row"><div><b>'+esc(x.full_name||'Unnamed applicant')+'</b><div>'+esc(x.email||'')+(x.phone?' · '+esc(x.phone):'')+'</div><div>Requested role: <b>'+esc(x.requested_role).replace('_',' ')+'</b></div></div><div><button data-approve="'+x.id+'">Approve</button> <button class="secondary" data-reject="'+x.id+'">Reject</button></div></div></div>').join(''):'<p>No pending staff requests.</p>';box.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>staffDecision(b.dataset.approve,'approve'));box.querySelectorAll('[data-reject]').forEach(b=>b.onclick=()=>staffDecision(b.dataset.reject,'reject'))}catch(e){msg('appMsg',e.message,'error')}}
 async function staffDecision(id,action){try{const rows=await api('/rest/v1/'+PROFILE_TABLE+'?select=requested_role&id=eq.'+id);const requested=rows[0]?.requested_role;if(!requested)throw Error('Requested role was not found.');const body=action==='approve'?{role:requested,approval_status:'approved',requested_role:null}:{approval_status:'rejected'};await api('/rest/v1/'+PROFILE_TABLE?id=eq.'+id,{method:'PATCH',body:JSON.stringify(body)});msg('appMsg',action==='approve'?'Staff account approved successfully.':'Staff request rejected.','ok');await loadStaffRequests()}catch(e){msg('appMsg',e.message,'error')}}
