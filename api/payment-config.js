@@ -1,0 +1,1 @@
+module.exports=(req,res)=>{if(!process.env.RAZORPAY_KEY_ID)return res.status(500).json({error:'Payment configuration unavailable'});res.status(200).json({key_id:process.env.RAZORPAY_KEY_ID});};
