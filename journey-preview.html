@@ -22,7 +22,7 @@ const code=document.getElementById('code');
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 async function loadProject(){
  const id=new URLSearchParams(location.search).get('project');
- if(!id){document.querySelector('.hero .eyebrow').textContent='PROJECT JOURNEY · PREVIEW MODE';return}
+ if(!id){document.querySelector('.hero .eyebrow').textContent='MEMBER LEARNING JOURNEY';return}
  try{
   const r=await fetch(SB+'/rest/v1/projects?id=eq.'+encodeURIComponent(id)+'&select=id,title,intro,level,foundation,basics,outcome,components,circuit_diagram,circuit_notes,program_code,program_notes,standard_outcomes,mentor_id,status',{headers:{apikey:KEY}});
   const rows=await r.json(); if(!r.ok||!rows[0])throw Error('Project not found');
