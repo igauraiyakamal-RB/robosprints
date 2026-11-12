@@ -15,8 +15,21 @@
   </div>
   <div id="journeyCountdown" class="countdown"></div>
  </div>
-</div><script>(async function(){
-const pid=new URLSearchParams(location.search).get('project'),token=localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token');
+</div><script>function getStudentSessionToken(){
+ const direct=getStudentSessionToken();
+ if(direct)return direct;
+ for(const store of [localStorage,sessionStorage]){
+  for(let i=0;i<store.length;i++){
+   const k=store.key(i)||'';
+   if(k.startsWith('sb-')&&k.endsWith('-auth-token')){
+    try{const v=JSON.parse(store.getItem(k)||'{}');const t=v.access_token||v.currentSession?.access_token;if(t)return t}catch(e){}
+   }
+  }
+ }
+ return '';
+}
+(async function(){
+const pid=new URLSearchParams(location.search).get('project'),token=getStudentSessionToken();
 if(!pid){location.replace('/');return}if(!token){location.replace('/student-login.html');return}
 document.documentElement.style.visibility='hidden';
 try{
@@ -85,8 +98,8 @@ async function placeOrder(){
  if(!address||!phone){msg.textContent='Please enter your delivery address and phone number.';return}
  const missing=[...document.querySelectorAll('.have')].filter(x=>!x.checked).map(x=>Number(x.dataset.i));
  if(!missing.length){msg.textContent='You have marked all parts as available. Please continue to Build & Learn.';return}
- const token=localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token');
- if(!token){location.href='/student-login.html';return}
+ const token=getStudentSessionToken();
+ if(!token){msg.textContent='Your student session could not be found. Please return to Continue Learning and try again — your learning progress is safe.';return}
  msg.textContent='Preparing your secure payment…';
  try{
   const r=await fetch('/api/create-parts-order',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({project_id:id,missing_indexes:missing})}),x=await r.json();
@@ -111,12 +124,12 @@ async function placeOrder(){
  }catch(e){msg.textContent=e.message||'We could not start payment. Please try again.'}
 }
 load();renderProgress();
-</script><script>(function(){const SB='https://ymndslqkhuubgoxxkuei.supabase.co',KEY='sb_publishable_u9d-jX_yxaofcUIw1Ou6lg__GaE3sPa';window.RoboSprintsMemory={rememberProject(p){localStorage.setItem('robosprints_selected_project',JSON.stringify(p))},project(){try{return JSON.parse(localStorage.getItem('robosprints_selected_project')||'null')}catch(e){return null}},key(id){return 'robosprints_journey_'+id},saveJourney(id,d){localStorage.setItem(this.key(id),JSON.stringify(Object.assign({},d,{updated_at:new Date().toISOString()})))},loadJourney(id){try{return JSON.parse(localStorage.getItem(this.key(id))||'{}')}catch(e){return {}}}};async function profile(){const token=localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_mentor_token');if(!token)return;try{const u=await fetch(SB+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+token}});if(!u.ok)return;const user=await u.json(),r=await fetch(SB+'/rest/v1/user_profiles?select=full_name&id=eq.'+encodeURIComponent(user.id),{headers:{apikey:KEY,Authorization:'Bearer '+token}}),rows=r.ok?await r.json():[],name=(rows[0]&&rows[0].full_name)||user.user_metadata?.full_name||user.email.split('@')[0];const identity=document.getElementById('studentIdentity');if(identity){identity.textContent='👤 '+name;identity.style.cursor='pointer';identity.title='Open My Profile';identity.onclick=()=>location.href='/profile.html'}else{const h=document.querySelector('header .nav')||document.querySelector('header');if(h&&!document.getElementById('rsProfileChip')){const e=document.createElement('div');e.id='rsProfileChip';e.textContent='👤 '+name;h.appendChild(e)}}localStorage.setItem('robosprints_profile_name',name)}catch(e){}}profile()})();</script><script>(function(){const pid=new URLSearchParams(location.search).get('project');if(!pid)return;const M=RoboSprintsMemory;M.rememberProject({id:pid,title:document.title.replace(' | RoboSprints',''),last_opened:new Date().toISOString()});const S=M.loadJourney(pid);['videoGuess','principleNote','workingNote','applicationNote','address','phone'].forEach(id=>{const e=document.getElementById(id);if(!e)return;e.value=S[id]||'';e.addEventListener('input',()=>{const x=M.loadJourney(pid);x[id]=e.value;M.saveJourney(pid,x)})});const oldShow=window.showStage;window.showStage=function(n){oldShow(n);const x=M.loadJourney(pid);x.stage=n;M.saveJourney(pid,x)};const saved=S.stage;if(Number.isInteger(saved))setTimeout(()=>window.showStage(saved),300)})();</script><script>
+</script><script>(function(){const SB='https://ymndslqkhuubgoxxkuei.supabase.co',KEY='sb_publishable_u9d-jX_yxaofcUIw1Ou6lg__GaE3sPa';window.RoboSprintsMemory={rememberProject(p){localStorage.setItem('robosprints_selected_project',JSON.stringify(p))},project(){try{return JSON.parse(localStorage.getItem('robosprints_selected_project')||'null')}catch(e){return null}},key(id){return 'robosprints_journey_'+id},saveJourney(id,d){localStorage.setItem(this.key(id),JSON.stringify(Object.assign({},d,{updated_at:new Date().toISOString()})))},loadJourney(id){try{return JSON.parse(localStorage.getItem(this.key(id))||'{}')}catch(e){return {}}}};async function profile(){const token=getStudentSessionToken()||sessionStorage.getItem('robosprints_mentor_token');if(!token)return;try{const u=await fetch(SB+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+token}});if(!u.ok)return;const user=await u.json(),r=await fetch(SB+'/rest/v1/user_profiles?select=full_name&id=eq.'+encodeURIComponent(user.id),{headers:{apikey:KEY,Authorization:'Bearer '+token}}),rows=r.ok?await r.json():[],name=(rows[0]&&rows[0].full_name)||user.user_metadata?.full_name||user.email.split('@')[0];const identity=document.getElementById('studentIdentity');if(identity){identity.textContent='👤 '+name;identity.style.cursor='pointer';identity.title='Open My Profile';identity.onclick=()=>location.href='/profile.html'}else{const h=document.querySelector('header .nav')||document.querySelector('header');if(h&&!document.getElementById('rsProfileChip')){const e=document.createElement('div');e.id='rsProfileChip';e.textContent='👤 '+name;h.appendChild(e)}}localStorage.setItem('robosprints_profile_name',name)}catch(e){}}profile()})();</script><script>(function(){const pid=new URLSearchParams(location.search).get('project');if(!pid)return;const M=RoboSprintsMemory;M.rememberProject({id:pid,title:document.title.replace(' | RoboSprints',''),last_opened:new Date().toISOString()});const S=M.loadJourney(pid);['videoGuess','principleNote','workingNote','applicationNote','address','phone'].forEach(id=>{const e=document.getElementById(id);if(!e)return;e.value=S[id]||'';e.addEventListener('input',()=>{const x=M.loadJourney(pid);x[id]=e.value;M.saveJourney(pid,x)})});const oldShow=window.showStage;window.showStage=function(n){oldShow(n);const x=M.loadJourney(pid);x.stage=n;M.saveJourney(pid,x)};const saved=S.stage;if(Number.isInteger(saved))setTimeout(()=>window.showStage(saved),300)})();</script><script>
 /* Permanent account journey sync. Browser memory remains a fast backup. */
 (function(){
  const SB='https://ymndslqkhuubgoxxkuei.supabase.co',KEY='sb_publishable_u9d-jX_yxaofcUIw1Ou6lg__GaE3sPa';
  const pid=new URLSearchParams(location.search).get('project'); if(!pid)return;
- const token=localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token'); if(!token)return;
+ const token=getStudentSessionToken(); if(!token)return;
  const headers={apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'};
  async function api(path,opt={}){const r=await fetch(SB+path,{...opt,headers:{...headers,...(opt.headers||{})}});if(!r.ok)throw Error(await r.text());return r.status===204?null:r.json()}
  async function sync(){
