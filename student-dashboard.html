@@ -16,7 +16,8 @@
   <div id="journeyCountdown" class="countdown"></div>
  </div>
 </div><script>function getStudentSessionToken(){
- const direct=getStudentSessionToken();
+ // Read an existing student session without calling this function recursively.
+ const direct=localStorage.getItem('student_session_token')||sessionStorage.getItem('student_session_token')||'';
  if(direct)return direct;
  for(const store of [localStorage,sessionStorage]){
   for(let i=0;i<store.length;i++){
