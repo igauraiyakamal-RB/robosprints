@@ -7,6 +7,26 @@ module.exports=async(req,res)=>{
  const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');if(!token)return res.status(401).json({error:'Please log in.'});
  try{
   const user=await currentUser(token);
+  const actor=(await q('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(user.id)+'&select=id,role,approval_status'))[0]||{};
+  const scope=String(req.query?.scope||'');
+  if(scope==='parts'){
+   if(req.method==='GET'){
+    const qq=String(req.query?.q||'').trim();let path='/rest/v1/parts_catalog?active=eq.true&pricing_status=eq.approved&select=id,name,description,sku,sale_price,stock_on_hand,reorder_level';
+    if(qq)path+='&name=ilike.*'+encodeURIComponent(qq)+'*';return res.json({success:true,parts:await q(path+'&order=name.asc')});
+   }
+   const b=req.body||{};
+   if(req.method==='POST'&&b.action==='request_part'){if(actor.role!=='mentor')return res.status(403).json({error:'Only Mentors can raise technical part requirements.'});const rows=await q('/rest/v1/part_requirements',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({mentor_id:actor.id,project_id:b.project_id||null,requested_name:String(b.requested_name||'').trim(),specification:b.specification||null,quantity:Math.max(1,Number(b.quantity)||1)})});return res.json({success:true,requirement:rows[0]})}
+   if(req.method==='POST'&&b.action==='propose_part'){if(actor.role!=='purchase_manager')return res.status(403).json({error:'Purchase Manager access required.'});const rows=await q('/rest/v1/parts_catalog',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({name:b.name,description:b.description||null,active:false,pricing_status:'pending_approval',proposed_cost_price:Number(b.cost_price)||0,proposed_sale_price:Number(b.sale_price)||0,proposed_by:actor.id,proposed_at:new Date().toISOString(),stock_on_hand:Number(b.stock_on_hand)||0,reorder_level:Number(b.reorder_level)||0,supplier_name:b.supplier_name||null})});return res.json({success:true,part:rows[0]})}
+   if(req.method==='PATCH'&&b.action==='propose_price'){if(actor.role!=='purchase_manager')return res.status(403).json({error:'Purchase Manager access required.'});await q('/rest/v1/parts_catalog?id=eq.'+encodeURIComponent(b.part_id),{method:'PATCH',body:JSON.stringify({proposed_cost_price:Number(b.cost_price),proposed_sale_price:Number(b.sale_price),pricing_status:'pending_approval',proposed_by:actor.id,proposed_at:new Date().toISOString()})});return res.json({success:true,message:'Pricing sent for Business Manager approval.'})}
+   if(req.method==='PATCH'&&b.action==='approve_price'){if(actor.role!=='business_manager')return res.status(403).json({error:'Business Manager approval required.'});const part=(await q('/rest/v1/parts_catalog?id=eq.'+encodeURIComponent(b.part_id)+'&select=proposed_cost_price,proposed_sale_price'))[0];if(!part||Number(part.proposed_sale_price)<=Number(part.proposed_cost_price))return res.status(400).json({error:'Sale price must be greater than cost price.'});await q('/rest/v1/parts_catalog?id=eq.'+encodeURIComponent(b.part_id),{method:'PATCH',body:JSON.stringify({cost_price:part.proposed_cost_price,sale_price:part.proposed_sale_price,price:part.proposed_sale_price,pricing_status:'approved',active:true,approved_by:actor.id,approved_at:new Date().toISOString()})});return res.json({success:true,message:'Price approved and live.'})}
+   return res.status(405).json({error:'Method not allowed'});
+  }
+  if(scope==='analytics'){
+   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
+   if(!['business_manager','accounts_manager'].includes(actor.role))return res.status(403).json({error:'Business or Accounts Manager access required.'});
+   const [memberships,orders,items]=await Promise.all([q('/rest/v1/memberships?status=eq.paid&select=id,plan_name,amount,created_at,razorpay_payment_id'),q('/rest/v1/orders?status=in.(paid,paid_pending_dispatch,processing,dispatched,delivered)&select=id,total,status,paid_at,razorpay_payment_id'),q('/rest/v1/order_items?select=order_id,part_id,quantity,unit_price')]);
+   const ids=[...new Set(items.map(i=>i.part_id).filter(Boolean))];const parts=ids.length?await q('/rest/v1/parts_catalog?id=in.('+ids.join(',')+')&select=id,cost_price'):[];const costs=Object.fromEntries(parts.map(x=>[x.id,Number(x.cost_price||0)]));const mc=memberships.reduce((s,x)=>s+Number(x.amount||0),0),pc=orders.reduce((s,x)=>s+Number(x.total||0),0),cost=items.reduce((s,x)=>s+Number(x.quantity||0)*costs[x.part_id],0);return res.json({success:true,summary:{membership_collection:mc,membership_count:memberships.length,parts_collection:pc,parts_order_count:orders.length,total_gross_collection:mc+pc,estimated_parts_cost:cost,estimated_parts_gross_profit:pc-cost},memberships,orders});
+  }
   if(req.method==='PATCH'){
    const body=req.body||{},update={};for(const f of fields)if(Object.prototype.hasOwnProperty.call(body,f))update[f]=String(body[f]||'').trim()||null;
    if(update.full_name!==undefined&&update.full_name===null)return res.status(400).json({error:'Name is required.'});
