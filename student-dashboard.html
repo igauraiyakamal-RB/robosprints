@@ -98,11 +98,13 @@ function openCart(){const saved=RoboSprintsMemory&&RoboSprintsMemory.loadJourney
 function saveParts(){}
 function calc(){let total=0,count=0;document.querySelectorAll('.have').forEach(x=>{if(x.checked){const p=parts[Number(x.dataset.i)]||{};total+=Number(p.price||0)*(Number(p.quantity)||1);count++}});document.getElementById('total').textContent='₹'+total.toFixed(0)+(count?' ('+count+' item'+(count>1?'s':'')+')':'');const m=document.getElementById('cartMsg');if(m)m.textContent=count?'Only your '+count+' selected part'+(count>1?'s are':' is')+' in this cart.':'Select at least one part you need to purchase.'}
 function markAllParts(){}
-function checkout(){const selected=[...document.querySelectorAll('.have')].filter(x=>x.checked);const m=document.getElementById('cartMsg');if(!selected.length){if(m)m.textContent='Please select at least one part before continuing.';return}showStage(6)}
+function checkout(){const selected=[...document.querySelectorAll('.have')].filter(x=>x.checked);const saved=RoboSprintsMemory&&RoboSprintsMemory.loadJourney(id).needParts||{};const hasSaved=Object.keys(saved).some(k=>saved[k]);const m=document.getElementById('cartMsg');if(!selected.length&&!hasSaved){if(m)m.textContent='Please select at least one part before continuing.';return}showStage(6)}
 async function placeOrder(){
  const address=document.getElementById('address').value.trim(),phone=document.getElementById('phone').value.trim(),msg=document.getElementById('orderMsg');
  if(!address||!phone){msg.textContent='Please enter your delivery address and phone number.';return}
- const missing=[...document.querySelectorAll('.have')].filter(x=>x.checked).map(x=>Number(x.dataset.i));
+ const cartSelections=[...document.querySelectorAll('.have')].filter(x=>x.checked).map(x=>Number(x.dataset.i));
+ const savedSelections=RoboSprintsMemory&&RoboSprintsMemory.loadJourney(id).needParts||{};
+ const missing=cartSelections.length?cartSelections:Object.keys(savedSelections).filter(k=>savedSelections[k]).map(Number);
  if(!missing.length){msg.textContent='Please select the parts you need to order.';return}
  const token=getStudentSessionToken();
  if(!token){msg.textContent='Your student session could not be found. Please return to Continue Learning and try again — your learning progress is safe.';return}
