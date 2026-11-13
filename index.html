@@ -90,13 +90,14 @@ function loggedInHeader(name){
  const action=document.getElementById('studentAction');if(action)action.innerHTML='<a class="btn btn-solid" href="/student-login.html">My Learning Journey →</a>';
  const h=document.querySelector('header .nav')||document.querySelector('header');if(!h||document.getElementById('rsProfileChip'))return;
  const e=document.createElement('div');e.id='rsProfileChip';e.style.cssText='display:flex;align-items:center;gap:8px;margin-left:10px;padding:6px 9px;border:1px solid #dfe7df;border-radius:22px;background:#fff;font-size:12px;font-weight:800;white-space:nowrap';
- const safe=String(name||'Student').replace(/[&<>"]/g,'');e.innerHTML='👤 <span>Welcome, '+safe+'</span><button type="button" id="rsLogoutBtn" style="border:0;background:#f3f5f2;border-radius:14px;padding:6px 10px;font-weight:800;cursor:pointer">Log out</button>';
+ const safe=String(name||'Student').replace(/[&<>"]/g,'');e.innerHTML='👤 <span>Welcome, '+safe+'</span><small id="rsJourneyCount" style="color:#4f8068">Checking journeys…</small><button type="button" id="rsLogoutBtn" style="border:0;background:#f3f5f2;border-radius:14px;padding:6px 10px;font-weight:800;cursor:pointer">Log out</button>';
  e.querySelector('#rsLogoutBtn').onclick=logout;h.appendChild(e);
 }
 async function profile(){
  const t=token();if(!t)return;
  const cached=localStorage.getItem('robosprints_profile_name')||localStorage.getItem('robosprints_student_name');
  if(cached)loggedInHeader(cached); else loggedInHeader('Student');
+ try{const jr=await fetch('/api/student-journey-summary',{headers:{Authorization:'Bearer '+t}}),j=await jr.json();if(jr.ok){const el=document.getElementById('rsJourneyCount');if(el)el.textContent='Journey '+j.used+' of '+j.limit+' this month';}}catch(e){console.warn('Journey summary unavailable',e)}
  try{
   const u=await fetch(SB+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+t}});if(!u.ok)return;
   const user=await u.json(),r=await fetch(SB+'/rest/v1/user_profiles?select=full_name&id=eq.'+encodeURIComponent(user.id),{headers:{apikey:KEY,Authorization:'Bearer '+t}}),rows=r.ok?await r.json():[];
