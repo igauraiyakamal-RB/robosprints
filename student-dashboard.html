@@ -30,7 +30,7 @@
  return '';
 }
 (async function(){
-const pid=new URLSearchParams(location.search).get('project'),token=getStudentSessionToken();
+const pid=new URLSearchParams(location.search).get('project'),token=getStudentSessionToken(); window.RoboSprintsSelectedProject={pid,token};
 if(!pid){location.replace('/');return}if(!token){location.replace('/student-login.html');return}
 document.documentElement.style.visibility='hidden';
 try{
@@ -38,7 +38,7 @@ try{
  if(!r.ok){alert(x.error||'You do not have access to this project.');location.replace('/membership-plans.html?project='+encodeURIComponent(pid));return}
  document.documentElement.style.visibility='visible';
  const plan=String(x.plan||'').toLowerCase().replace(/\s+/g,'');
- if(plan==='1month'||plan==='1-month'||plan==='3months'||plan==='3month'||plan==='3-months'||plan==='3-month'){
+ if(!x.started){ const title=document.getElementById('planNoticeTitle'); if(title)title.textContent='Ready to start this Learning Journey?'; const msg=document.querySelector('#planNotice p'); if(msg)msg.textContent='This will become Learning Journey '+(Number(x.journeys_used||0)+1)+' of 4 for this month. Exploring a project does not use a journey.';
    const modal=document.getElementById('planNotice');
    if(modal)modal.classList.remove('hidden');
  }
@@ -46,11 +46,11 @@ try{
 })();</script><script>
 (function(){
  const modal=document.getElementById('planNotice'),start=document.getElementById('startJourneyBtn'),upgrade=document.getElementById('upgradePlanBtn'),count=document.getElementById('journeyCountdown');
- if(start)start.onclick=()=>{
-   start.disabled=true; if(upgrade)upgrade.disabled=true;
-   let left=2.5; count.textContent='Starting your learning journey in 2.5 seconds…';
-   const timer=setInterval(()=>{left=Math.max(0,left-.5);count.textContent=left>0?'Starting your learning journey in '+left.toFixed(1)+' seconds…':'Your journey is starting…';},500);
-   setTimeout(()=>{clearInterval(timer);modal.classList.add('hidden');},2500);
+ if(start)start.onclick=async()=>{
+   start.disabled=true; if(upgrade)upgrade.disabled=true; count.textContent='Starting your learning journey…';
+   try{const q=window.RoboSprintsSelectedProject||{},r=await fetch('/api/student-project-access',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+q.token},body:JSON.stringify({project_id:q.pid,action:'start'})}),x=await r.json();
+   if(!r.ok)throw Error(x.error||'Unable to start journey'); count.textContent='✓ Your Learning Journey is now active.'; setTimeout(()=>modal.classList.add('hidden'),900);
+   }catch(e){alert(e.message);start.disabled=false;if(upgrade)upgrade.disabled=false;count.textContent='';}
  };
  if(upgrade)upgrade.onclick=()=>{location.href='/membership-plans.html?project='+encodeURIComponent(new URLSearchParams(location.search).get('project')||'')};
 })();
