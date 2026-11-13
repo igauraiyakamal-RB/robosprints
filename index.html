@@ -87,7 +87,7 @@ window.RoboSprintsMemory={rememberProject(p){localStorage.setItem('robosprints_s
 function token(){return localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token')||localStorage.getItem('student_session_token')||sessionStorage.getItem('student_session_token')}
 function logout(){['robosprints_session_token','student_session_token','robosprints_profile_name','robosprints_student_name'].forEach(k=>{localStorage.removeItem(k);sessionStorage.removeItem(k)});location.href='/'}
 function loggedInHeader(name){
- const action=document.getElementById('studentAction');if(action)action.innerHTML='<a class="btn btn-solid" href="/student-dashboard.html">My Learning Journey →</a>';
+ const action=document.getElementById('studentAction');if(action)action.innerHTML='<a class="btn btn-solid" href="/student-login.html">My Learning Journey →</a>';
  const h=document.querySelector('header .nav')||document.querySelector('header');if(!h||document.getElementById('rsProfileChip'))return;
  const e=document.createElement('div');e.id='rsProfileChip';e.style.cssText='display:flex;align-items:center;gap:8px;margin-left:10px;padding:6px 9px;border:1px solid #dfe7df;border-radius:22px;background:#fff;font-size:12px;font-weight:800;white-space:nowrap';
  const safe=String(name||'Student').replace(/[&<>"]/g,'');e.innerHTML='👤 <span>Welcome, '+safe+'</span><button type="button" id="rsLogoutBtn" style="border:0;background:#f3f5f2;border-radius:14px;padding:6px 10px;font-weight:800;cursor:pointer">Log out</button>';
@@ -111,6 +111,6 @@ const a=e.target.closest('a[href*="/join.html?project="]');if(!a)return;
 const u=new URL(a.href),id=u.searchParams.get('project');
 const p=(window.liveProjects||[]).find(x=>String(x.id)===String(id));
 RoboSprintsMemory.rememberProject({id:id,title:p?p.title:'Selected Project',level:p?p.level:'',selected_at:new Date().toISOString()});
-const token=localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token');
+const token=localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token')||localStorage.getItem('student_session_token')||sessionStorage.getItem('student_session_token');
 if(token){e.preventDefault();location.href='/student-dashboard.html?project='+encodeURIComponent(id);}
 });</script></body></html>
