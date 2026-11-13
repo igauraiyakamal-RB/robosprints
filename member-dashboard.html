@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Account | RoboSprints</title>
+<style>
+:root{--ink:#102725;--brand:#315eea;--lime:#b7f533;--bg:#f4f7f5;--line:#dfe7e2;--muted:#66736e}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}header{background:#fff;border-bottom:1px solid var(--line);padding:14px 5%;display:flex;justify-content:space-between;align-items:center}.brand{font-size:24px;font-weight:800}.brand span{color:var(--brand)}main{max-width:1120px;margin:auto;padding:28px 18px}.hero{background:linear-gradient(120deg,#102725,#193a35);color:#fff;border-radius:22px;padding:28px}.hero h1{margin:8px 0}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;margin:18px 0}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}.stat{background:#fff;border:1px solid var(--line);border-radius:15px;padding:18px}.stat b{font-size:28px}.muted{color:var(--muted)}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 8px;border-bottom:1px solid var(--line)}.btn{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:bold;cursor:pointer}.secondary{background:#edf1ef;color:var(--ink)}.badge{background:var(--lime);color:var(--ink);padding:5px 9px;border-radius:99px;font-size:12px;font-weight:bold}@media(max-width:700px){.stats{grid-template-columns:1fr}.card{overflow:auto}table{min-width:680px}}
+</style></head><body>
+<header><div class="brand">🤖 Robo<span>Sprints</span> <small class="muted">My Account</small></div><button class="btn secondary" onclick="location.href='/'">Back to RoboSprints</button></header>
+<main>
+<section class="hero"><span class="badge">MEMBER STUDENT ACCOUNT</span><h1 id="welcome">Welcome</h1><p id="membership" class="muted" style="color:#d5e1dc">Loading your live membership information…</p></section>
+<section class="stats"><div class="stat"><span class="muted">Learning Journeys</span><br><b id="used">—</b> <span class="muted">of 4 used this month</span></div><div class="stat"><span class="muted">Active Journeys</span><br><b id="active">—</b></div><div class="stat"><span class="muted">Parts Orders</span><br><b id="orders">—</b></div></section>
+<section class="card"><h2>My Learning Journeys</h2><p class="muted">Your saved stages are shown here. Resume any journey that is not completed.</p><table><thead><tr><th>Project</th><th>Current Stage</th><th>Status</th><th>Action</th></tr></thead><tbody id="journeys"><tr><td colspan="4">Loading live journey data…</td></tr></tbody></table></section>
+<section class="card"><h2>My Parts Orders</h2><p class="muted">Paid project parts and delivery status are linked to your learning journeys.</p><table><thead><tr><th>Project</th><th>Order / Payment</th><th>Delivery Status</th><th>Action</th></tr></thead><tbody id="orderRows"><tr><td colspan="4">Loading your order information…</td></tr></tbody></table></section>
+</main>
+<script>
+function token(){return localStorage.getItem('student_session_token')||sessionStorage.getItem('student_session_token')||localStorage.getItem('robosprints_session_token')||sessionStorage.getItem('robosprints_session_token')||''}
+const esc=s=>String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+(async()=>{
+ const t=token();if(!t){location.replace('/student-login.html');return}
+ try{
+  const h={Authorization:'Bearer '+t};
+  const [p,s]=await Promise.all([fetch('/api/student-profile',{headers:h}).then(r=>r.json()),fetch('/api/student-journey-summary',{headers:h}).then(r=>r.json())]);
+  if(p.name)document.getElementById('welcome').textContent='Welcome, '+p.name;
+  document.getElementById('membership').textContent=(p.plan||'Active membership')+(p.expires_at?' · Expires '+new Date(p.expires_at).toLocaleDateString():'');
+  const journeys=s.journeys||[];document.getElementById('used').textContent=s.used||0;
+  const apiKey='sb_publishable_u9d-jX_yxaofcUIw1Ou6lg__GaE3sPa',base='https://ymndslqkhuubgoxxkuei.supabase.co';
+  const u=await fetch(base+'/auth/v1/user',{headers:{apikey:apiKey,Authorization:'Bearer '+t}}).then(r=>r.json());
+  const rows=await fetch(base+'/rest/v1/student_project_journeys?select=*&student_id=eq.'+encodeURIComponent(u.id)+'&order=last_opened_at.desc',{headers:{apikey:apiKey,Authorization:'Bearer '+t}}).then(r=>r.json());
+  const ids=[...new Set(rows.map(x=>x.project_id).filter(Boolean))];
+  let projects=[];if(ids.length)projects=await fetch(base+'/rest/v1/projects?select=id,title&id=in.('+ids.join(',')+')',{headers:{apikey:apiKey,Authorization:'Bearer '+t}}).then(r=>r.json());
+  const names=Object.fromEntries((projects||[]).map(x=>[x.id,x.title]));
+  const activeRows=rows.filter(x=>Number(x.current_stage||0)<8);document.getElementById('active').textContent=activeRows.length;
+  document.getElementById('journeys').innerHTML=rows.length?rows.map(x=>{const stage=Number(x.current_stage||0)+1,done=stage>=9;return '<tr><td><b>'+esc(names[x.project_id]||'Project')+'</b></td><td>Stage '+stage+' of 9</td><td><span class="badge">'+(done?'Completed':'In progress')+'</span></td><td><button class="btn" onclick="location.href=\'/student-dashboard.html?project='+encodeURIComponent(x.project_id)+'\'">'+(done?'View Project':'Resume')+' →</button></td></tr>'}).join(''):'<tr><td colspan="4">No learning journey has been started yet.</td></tr>';
+  const orderRows=rows.filter(x=>x.delivery_address&&typeof x.delivery_address==='object'&&(x.delivery_address.business_order_id||x.delivery_address.razorpay_payment_id||x.delivery_address.order_status));
+  document.getElementById('orders').textContent=orderRows.length;
+  document.getElementById('orderRows').innerHTML=orderRows.length?orderRows.map(x=>{const d=x.delivery_address||{};return '<tr><td><b>'+esc(names[x.project_id]||'Project')+'</b></td><td>'+esc(d.business_order_id||d.razorpay_payment_id||'Paid order')+'</td><td><span class="badge">'+esc(d.order_status||'Payment confirmed')+'</span></td><td><button class="btn secondary" onclick="location.href=\'/student-dashboard.html?project='+encodeURIComponent(x.project_id)+'\'">Open Journey</button></td></tr>'}).join(''):'<tr><td colspan="4">No paid parts orders recorded yet.</td></tr>';
+ }catch(e){console.error(e);document.getElementById('journeys').innerHTML='<tr><td colspan="4">We could not load your account. Please log in again.</td></tr>';document.getElementById('orderRows').innerHTML='<tr><td colspan="4">Order data could not be loaded.</td></tr>'}
+})();
+</script></body></html>
