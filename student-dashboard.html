@@ -55,7 +55,7 @@ try{
  if(upgrade)upgrade.onclick=()=>{location.href='/membership-plans.html?project='+encodeURIComponent(new URLSearchParams(location.search).get('project')||'')};
 })();
 </script>
-<header><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div class="brand">🤖 Robo<span>Sprints</span> <small class="muted">My Learning Journey</small></div><div id="studentIdentity" class="muted" style="font-size:13px;font-weight:bold"></div></div><div id="saveStatus" class="muted" style="font-size:12px;margin-top:5px">Progress saves automatically</div></header>
+<header><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div class="brand">🤖 Robo<span>Sprints</span> <small class="muted">My Learning Journey</small></div><div style="display:flex;align-items:center;gap:12px"><div id="studentIdentity" class="muted" style="font-size:13px;font-weight:bold"></div><button class="btn secondary" id="logoutBtn" style="padding:8px 13px;font-size:12px">Log out</button></div></div><div id="saveStatus" class="muted" style="font-size:12px;margin-top:5px">Progress saves automatically</div></header><script>document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('logoutBtn');if(b)b.onclick=()=>{localStorage.removeItem('student_session_token');sessionStorage.removeItem('student_session_token');localStorage.removeItem('robosprints_session_token');sessionStorage.removeItem('robosprints_session_token');location.href='/';};});</script>
 <main>
 <section class="hero"><span class="badge">🎉 YOUR SELECTED PROJECT</span><h1 id="title">Welcome to your project journey</h1><p class="lead" id="intro">Your exciting learning journey starts here.</p></section>
 <div class="progress" id="progress"></div>
