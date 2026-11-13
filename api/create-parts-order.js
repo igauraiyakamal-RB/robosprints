@@ -13,10 +13,10 @@ module.exports=async(req,res)=>{
   if(!ur.ok||!user?.id)return res.status(401).json({error:'Please log in again before payment.'});
   const profile=(await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(user.id)+'&select=role,membership_status'))[0];
   if(!profile||profile.role!=='student'||profile.membership_status!=='active')return res.status(403).json({error:'An active student membership is required.'});
-  const parts=await sb('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(project_id)+'&order=sort_order.asc&select=id,name,price,quantity');
+  const parts=await sb('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(project_id)+'&order=sort_order.asc&select=id,name,price');
   const indexes=[...new Set(missing.map(Number).filter(i=>Number.isInteger(i)&&i>=0&&i<parts.length))];
   if(!indexes.length)return res.status(400).json({error:'Please select at least one missing part.'});
-  const items=indexes.map(i=>parts[i]),amount=items.reduce((s,p)=>s+Math.round(Number(p.price||0)*100)*(Number(p.quantity)||1),0);
+  const items=indexes.map(i=>parts[i]),amount=items.reduce((s,p)=>s+Math.round(Number(p.price||0)*100),0);
   if(!Number.isInteger(amount)||amount<100)return res.status(400).json({error:'The selected parts do not have a valid price.'});
   const razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
   const order=await razorpay.orders.create({amount,currency:'INR',receipt:'parts_'+Date.now(),notes:{project_id,student_id:user.id}});
