@@ -122,7 +122,9 @@ async function placeOrder(){
     msg.textContent='Verifying your payment securely…';
     const vr=await fetch('/api/verify-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(response)}),v=await vr.json();
     if(!vr.ok||!v.success)throw Error(v.error||'Payment verification failed.');
-    const delivery={address,phone,order_status:'Order Confirmed',expected_delivery:'Within 2.5 working days',razorpay_order_id:response.razorpay_order_id,razorpay_payment_id:response.razorpay_payment_id,items:x.items||[],paid_at:new Date().toISOString()};
+    const rr=await fetch('/api/record-parts-order',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({project_id:id,missing_indexes:missing,address,phone,...response})}),rx=await rr.json();
+    if(!rr.ok||!rx.success)throw Error(rx.error||'Payment was successful, but we could not record your delivery order. Please contact RoboSprints support with payment ID '+response.razorpay_payment_id+'.');
+    const delivery={address,phone,order_status:'Paid — pending dispatch',expected_delivery:'Within 2.5 working days',business_order_id:rx.order_id,razorpay_order_id:response.razorpay_order_id,razorpay_payment_id:response.razorpay_payment_id,items:x.items||[],paid_at:new Date().toISOString()};
     const M=window.RoboSprintsMemory;if(M&&id){const d=M.loadJourney(id);d.address=address;d.phone=phone;d.delivery=delivery;d.stage=6;M.saveJourney(id,d)}
     try{
       const u=await fetch(SB+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+token}}).then(a=>a.json());
