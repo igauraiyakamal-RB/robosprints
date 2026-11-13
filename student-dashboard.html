@@ -7,11 +7,11 @@
 <div id="planNotice" class="plan-modal hidden" role="dialog" aria-modal="true" aria-labelledby="planNoticeTitle">
  <div class="plan-box">
   <div style="font-size:36px">🚀</div>
-  <h2 id="planNoticeTitle">Your Beginner Journey is Ready!</h2>
-  <p>Your current membership gives you access to Beginner-level projects. Upgrade to a 6 Months or Full Year plan anytime to unlock Intermediate and Advanced projects.</p>
+  <h2 id="planNoticeTitle">Your RoboSprints Journey is Ready!</h2>
+  <p>Your membership gives you access to the projects included with your plan. 1 Month and 3 Months members can access Beginner & Intermediate projects. Advanced projects require an Annual Subscription. Your Project Manager controls these access rules.</p>
   <div class="plan-actions">
    <button class="btn" id="startJourneyBtn">OK, Start My Journey</button>
-   <button class="btn secondary" id="upgradePlanBtn">Upgrade Membership</button>
+   <button class="btn secondary" id="upgradePlanBtn">View Membership Plans</button>
   </div>
   <div id="journeyCountdown" class="countdown"></div>
  </div>
@@ -57,7 +57,7 @@ try{
 </script>
 <header><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div class="brand">🤖 Robo<span>Sprints</span> <small class="muted">My Learning Journey</small></div><div style="display:flex;align-items:center;gap:12px"><div id="studentIdentity" class="muted" style="font-size:13px;font-weight:bold"></div><button class="btn secondary" id="logoutBtn" style="padding:8px 13px;font-size:12px">Log out</button></div></div><div id="saveStatus" class="muted" style="font-size:12px;margin-top:5px">Progress saves automatically</div></header><script>document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('logoutBtn');if(b)b.onclick=()=>{localStorage.removeItem('student_session_token');sessionStorage.removeItem('student_session_token');localStorage.removeItem('robosprints_session_token');sessionStorage.removeItem('robosprints_session_token');location.href='/';};});</script>
 <main>
-<section class="hero"><span class="badge">🎉 YOUR SELECTED PROJECT</span><h1 id="title">Welcome to your project journey</h1><p class="lead" id="intro">Your exciting learning journey starts here.</p></section>
+<section class="hero"><span class="badge">🎉 MEMBER STUDENT · YOUR SELECTED PROJECT</span><h1 id="title">Welcome to your project journey</h1><p class="lead" id="intro">Your exciting learning journey starts here.</p><p class="lead" style="font-size:13px;margin:12px 0 0">Learn step by step, buy only the parts you need, continue learning while your order is processed, and complete your project with your mentor.</p></section>
 <div class="progress" id="progress"></div>
 <section class="card stage active" data-stage="0"><h2>Stage 1 — Welcome to Your Mission 🚀</h2><div id="welcome"></div><div class="mission"><b>Your mission:</b> By the end of this journey, you will understand, prepare, build and test your own project. Take it one exciting step at a time.</div><div class="actions"><button class="btn" onclick="next()">🚀 Start My Mission →</button></div></section>
 <section class="card stage" data-stage="1"><h2>Stage 2 — See the Complete Project</h2><p>Watch the complete project before building. It is organised around four important sections.</p><div class="video" id="video">▶<br><small>Your mentor can add the complete project video.</small></div><div class="chapters"><div class="chapter"><b>1. Introduction</b><small>What you are going to build.</small></div><div class="chapter"><b>2. Assembly & Parts</b><small>Understand the physical build.</small></div><div class="chapter"><b>3. Code Explanation</b><small>Learn the program logic.</small></div><div class="chapter"><b>4. Working</b><small>See your project in action.</small></div></div><div id="videoGuide"></div><div class="mission"><b>🤔 Before you continue:</b> What do you think makes this project work?</div><textarea id="videoGuess" placeholder="Write your guess before learning the answer..."></textarea><div class="actions"><button class="btn secondary" onclick="prev()">Back</button><button class="btn" onclick="next()">Thanks, let's continue learning →</button></div></section>
