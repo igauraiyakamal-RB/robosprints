@@ -11,6 +11,17 @@ module.exports=async(req,res)=>{
   const scope=String(req.query?.scope||'');
   if(scope==='parts'){
    if(req.method==='GET'){
+    if(String(req.query?.view||'')==='requirements'){
+     if(!['purchase_manager','project_manager','business_manager'].includes(actor.role))return res.status(403).json({error:'Manager access required.'});
+     const [requirements,projectParts,projects]=await Promise.all([
+      q('/rest/v1/part_requirements?select=*&order=created_at.desc'),
+      q('/rest/v1/project_parts?select=project_id,name,description,sort_order&order=project_id,sort_order.asc'),
+      q('/rest/v1/projects?select=id,title,status&status=in.(pending,published)&order=created_at.desc')
+     ]);
+     const pm=Object.fromEntries(projects.map(p=>[p.id,p]));
+     const liveProjectParts=projectParts.filter(x=>pm[x.project_id]).map(x=>({...x,project_title:pm[x.project_id].title,project_status:pm[x.project_id].status,source:'project'}));
+     return res.json({success:true,requirements,project_parts:liveProjectParts});
+    }
     const qq=String(req.query?.q||'').trim();let path='/rest/v1/parts_catalog?active=eq.true&pricing_status=eq.approved&select=id,name,description,sku,sale_price,stock_on_hand,reorder_level';
     if(qq)path+='&name=ilike.*'+encodeURIComponent(qq)+'*';return res.json({success:true,parts:await q(path+'&order=name.asc')});
    }
