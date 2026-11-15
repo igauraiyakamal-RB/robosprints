@@ -18,7 +18,7 @@ const esc=s=>String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&g
  const t=token();if(!t){location.replace('/student-login.html');return}
  try{
   const h={Authorization:'Bearer '+t};
-  const [p,s]=await Promise.all([fetch('/api/student-profile',{headers:h}).then(r=>r.json()),fetch('/api/student-journey-summary',{headers:h}).then(r=>r.json())]);
+  const [p,s]=await Promise.all([fetch('/api/student-profile',{headers:h}).then(r=>r.json()),fetch('/api/student-journey?action=summary',{headers:h}).then(r=>r.json())]);
   if(p.name)document.getElementById('welcome').textContent='Welcome, '+p.name; const pf=p.profile||{}; window._profile=pf; document.getElementById('profileSummary').textContent=(pf.full_name||p.name||'Member Student')+' · '+(pf.school_name||'School details not added yet')+' · '+(pf.phone||'Phone not added');
   document.getElementById('membership').textContent=(p.plan||'Active membership')+(p.expires_at?' · Expires '+new Date(p.expires_at).toLocaleDateString():'');
   const journeys=s.journeys||[];document.getElementById('used').textContent=s.used||0;
