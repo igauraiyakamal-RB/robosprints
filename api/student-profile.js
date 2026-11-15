@@ -16,7 +16,7 @@ module.exports=async(req,res)=>{
      const [requirements,projectParts,projects]=await Promise.all([
       q('/rest/v1/part_requirements?select=*&order=created_at.desc'),
       q('/rest/v1/project_parts?select=project_id,name,description,sort_order&order=project_id,sort_order.asc'),
-      q('/rest/v1/projects?select=id,title,status&status=in.(pending,published)&order=created_at.desc')
+      q('/rest/v1/projects?select=id,title,status&status=in.(pending,approved,published)&order=created_at.desc')
      ]);
      const pm=Object.fromEntries(projects.map(p=>[p.id,p]));
      const liveProjectParts=projectParts.filter(x=>pm[x.project_id]).map(x=>({...x,project_title:pm[x.project_id].title,project_status:pm[x.project_id].status,source:'project'}));
