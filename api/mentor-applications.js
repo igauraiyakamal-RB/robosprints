@@ -16,7 +16,7 @@ module.exports=async(req,res)=>{
   const {id,action}=req.body||{};if(!id||!['approve','reject'].includes(action))return res.status(400).json({error:'Invalid action.'});
   if(action==='approve'){
    await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({approval_status:'approved',updated_at:new Date().toISOString()})});
-   await sb('/auth/v1/admin/generate_link',{method:'POST',body:JSON.stringify({type:'recovery',email:(await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(id)+'&select=email'))[0].email,options:{redirect_to:'https://www.robosprints.in/reset-password.html'}}).catch(()=>({}));
+   const email=(await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(id)+'&select=email'))[0].email;await sb('/auth/v1/recover',{method:'POST',body:JSON.stringify({email,redirect_to:'https://www.robosprints.in/reset-password.html'})}).catch(()=>({}));
    return res.status(200).json({success:true,message:'Mentor approved. The applicant can now set a password and access Mentor Studio.'});
   }
   await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({approval_status:'rejected',updated_at:new Date().toISOString()})});
