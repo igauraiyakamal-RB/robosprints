@@ -27,6 +27,29 @@ module.exports=async(req,res)=>{
     if(qq)path+='&name=ilike.*'+encodeURIComponent(qq)+'*';return res.json({success:true,parts:await q(path+'&order=name.asc')});
    }
    const b=req.body||{};
+   if(req.method==='POST'&&b.action==='save_project_parts'){
+    if(actor.role!=='mentor'||actor.approval_status!=='approved')return res.status(403).json({error:'Approved Mentor access required.'});
+    const projectId=String(b.project_id||'');
+    const project=(await q('/rest/v1/projects?id=eq.'+encodeURIComponent(projectId)+'&select=id,mentor_id,status'))[0];
+    if(!project||project.mentor_id!==user.id)return res.status(403).json({error:'This project does not belong to the signed-in Mentor.'});
+    if(!['draft','pending'].includes(String(project.status||'')))return res.status(409).json({error:'Parts can only be changed while the project is a draft or awaiting approval.'});
+    const input=Array.isArray(b.parts)?b.parts:[];
+    if(input.length>40)return res.status(400).json({error:'A project can contain at most 40 parts.'});
+    const normalized=input.map((x,i)=>({name:String(x.name||'').trim(),description:String(x.description||'').trim()||null,quantity:Math.max(1,Math.min(999,Number(x.quantity)||1)),sort_order:i})).filter(x=>x.name);
+    await q('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(projectId),{method:'DELETE'});
+    if(normalized.length){
+     const catalog=await q('/rest/v1/parts_catalog?active=eq.true&select=id,name&order=name.asc');
+     const byName=Object.fromEntries(catalog.map(x=>[String(x.name||'').trim().toLowerCase(),x.id]));
+     const rows=normalized.map(x=>({project_id:projectId,name:x.name,description:x.description,sort_order:x.sort_order,price:0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]||null}));
+     await q('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(rows)});
+     await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(projectId),{method:'DELETE'});
+     const missing=normalized.filter(x=>!byName[x.name.toLowerCase()]);
+     if(missing.length)await q('/rest/v1/part_requirements',{method:'POST',body:JSON.stringify(missing.map(x=>({mentor_id:user.id,project_id:projectId,requested_name:x.name,specification:x.description,quantity:x.quantity,status:'pending_purchase'})))});
+    }else{
+     await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(projectId),{method:'DELETE'});
+    }
+    return res.json({success:true,saved_parts:normalized.length,unmatched_parts:normalized.filter(x=>true).length});
+   }
    if(req.method==='POST'&&b.action==='request_part'){if(actor.role!=='mentor')return res.status(403).json({error:'Only Mentors can raise technical part requirements.'});const rows=await q('/rest/v1/part_requirements',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({mentor_id:actor.id,project_id:b.project_id||null,requested_name:String(b.requested_name||'').trim(),specification:b.specification||null,quantity:Math.max(1,Number(b.quantity)||1)})});return res.json({success:true,requirement:rows[0]})}
    if(req.method==='POST'&&b.action==='propose_part'){if(actor.role!=='purchase_manager')return res.status(403).json({error:'Purchase Manager access required.'});const rows=await q('/rest/v1/parts_catalog',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({name:b.name,description:b.description||null,active:false,pricing_status:'pending_approval',proposed_cost_price:Number(b.cost_price)||0,proposed_sale_price:Number(b.sale_price)||0,proposed_by:actor.id,proposed_at:new Date().toISOString(),stock_on_hand:Number(b.stock_on_hand)||0,reorder_level:Number(b.reorder_level)||0,supplier_name:b.supplier_name||null})});return res.json({success:true,part:rows[0]})}
    if(req.method==='PATCH'&&b.action==='propose_price'){if(actor.role!=='purchase_manager')return res.status(403).json({error:'Purchase Manager access required.'});await q('/rest/v1/parts_catalog?id=eq.'+encodeURIComponent(b.part_id),{method:'PATCH',body:JSON.stringify({proposed_cost_price:Number(b.cost_price),proposed_sale_price:Number(b.sale_price),pricing_status:'pending_approval',proposed_by:actor.id,proposed_at:new Date().toISOString()})});return res.json({success:true,message:'Pricing sent for Business Manager approval.'})}
