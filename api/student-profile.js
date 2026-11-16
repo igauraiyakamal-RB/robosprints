@@ -18,9 +18,9 @@ module.exports=async(req,res)=>{
       q('/rest/v1/projects?select=id,title,status,created_at&order=created_at.desc')
      ]);
      const pm=Object.fromEntries(projects.map(p=>[p.id,p]));
-     const liveProjectParts=projectParts.filter(x=>pm[x.project_id]&&!['draft','rejected','archived','deleted'].includes(String(pm[x.project_id].status||'').toLowerCase())).map(x=>({...x,project_title:pm[x.project_id].title,project_status:pm[x.project_id].status,source:'project'}));
      let requirements=[];
      try{requirements=await q('/rest/v1/part_requirements?select=*&order=created_at.desc')}catch(e){console.warn('Optional part_requirements table unavailable:',e.message)}
+     const liveProjectParts=projectParts.filter(x=>pm[x.project_id]&&!['draft','rejected','archived','deleted'].includes(String(pm[x.project_id].status||'').toLowerCase())).map(x=>{const req=requirements.find(r=>r.project_id===x.project_id&&String(r.requested_name||'').trim().toLowerCase()===String(x.name||'').trim().toLowerCase());return {...x,quantity:Number(req?.quantity||1),project_title:pm[x.project_id].title,project_status:pm[x.project_id].status,source:'project'}});
      return res.json({success:true,requirements,project_parts:liveProjectParts});
     }
     const qq=String(req.query?.q||'').trim();let path='/rest/v1/parts_catalog?active=eq.true&pricing_status=eq.approved&select=id,name,description,sku,sale_price,stock_on_hand,reorder_level';
