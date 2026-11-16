@@ -14,7 +14,7 @@ module.exports=async(req,res)=>{
     if(String(req.query?.view||'')==='requirements'){
      if(!['purchase_manager','project_manager','business_manager'].includes(actor.role))return res.status(403).json({error:'Manager access required.'});
      const [projectParts,projects]=await Promise.all([
-      q('/rest/v1/project_parts?select=project_id,name,description,quantity,sort_order&order=project_id,sort_order.asc'),
+      q('/rest/v1/project_parts?select=project_id,name,description,sort_order&order=project_id,sort_order.asc'),
       q('/rest/v1/projects?select=id,title,status,created_at&order=created_at.desc')
      ]);
      const pm=Object.fromEntries(projects.map(p=>[p.id,p]));
