@@ -51,6 +51,7 @@ module.exports=async(req,res)=>{
      if(normalized.length){
       const catalog=await q('/rest/v1/parts_catalog?active=eq.true&select=id,name&order=name.asc');
       const byName=Object.fromEntries(catalog.map(x=>[String(x.name||'').trim().toLowerCase(),x.id]));
+     const catalogNames=new Set(Object.keys(byName));
       await q('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(normalized.map(x=>({project_id:change.project_id,name:x.name,description:x.description,sort_order:x.sort_order,price:0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]||null})))});
       await q('/rest/v1/part_requirements',{method:'POST',body:JSON.stringify(normalized.map(x=>({mentor_id:change.mentor_id,project_id:change.project_id,requested_name:x.name,specification:x.description,quantity:x.quantity,status:byName[x.name.toLowerCase()]?'catalog_available':'pending_purchase'})))});
      }
@@ -74,12 +75,11 @@ module.exports=async(req,res)=>{
      const rows=normalized.map(x=>({project_id:projectId,name:x.name,description:x.description,sort_order:x.sort_order,price:0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]||null}));
      await q('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(rows)});
      await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(projectId),{method:'DELETE'});
-     const missing=normalized.filter(x=>!byName[x.name.toLowerCase()]);
-     if(missing.length)await q('/rest/v1/part_requirements',{method:'POST',body:JSON.stringify(missing.map(x=>({mentor_id:user.id,project_id:projectId,requested_name:x.name,specification:x.description,quantity:x.quantity,status:'pending_purchase'})))});
+     await q('/rest/v1/part_requirements',{method:'POST',body:JSON.stringify(normalized.map(x=>({mentor_id:user.id,project_id:projectId,requested_name:x.name,specification:x.description,quantity:x.quantity,status:byName[x.name.toLowerCase()]?'catalog_available':'pending_purchase'})))});
     }else{
      await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(projectId),{method:'DELETE'});
     }
-    return res.json({success:true,saved_parts:normalized.length,unmatched_parts:normalized.filter(x=>true).length});
+    return res.json({success:true,saved_parts:normalized.length,unmatched_parts:normalized.filter(x=>!catalogNames.has(x.name.toLowerCase())).length});
    }
    if(req.method==='POST'&&b.action==='request_part'){if(actor.role!=='mentor')return res.status(403).json({error:'Only Mentors can raise technical part requirements.'});const rows=await q('/rest/v1/part_requirements',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({mentor_id:actor.id,project_id:b.project_id||null,requested_name:String(b.requested_name||'').trim(),specification:b.specification||null,quantity:Math.max(1,Number(b.quantity)||1)})});return res.json({success:true,requirement:rows[0]})}
    if(req.method==='POST'&&b.action==='propose_part'){if(actor.role!=='purchase_manager')return res.status(403).json({error:'Purchase Manager access required.'});const rows=await q('/rest/v1/parts_catalog',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({name:b.name,description:b.description||null,active:false,pricing_status:'pending_approval',proposed_cost_price:Number(b.cost_price)||0,proposed_sale_price:Number(b.sale_price)||0,proposed_by:actor.id,proposed_at:new Date().toISOString(),stock_on_hand:Number(b.stock_on_hand)||0,reorder_level:Number(b.reorder_level)||0,supplier_name:b.supplier_name||null})});return res.json({success:true,part:rows[0]})}
