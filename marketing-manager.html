@@ -13,7 +13,7 @@
 <section class="grid"><div class="card"><b class="num" id="total">—</b>Total institution leads</div><div class="card"><b class="num" id="meetings">—</b>Meetings scheduled</div><div class="card"><b class="num" id="proposals">—</b>Proposals</div><div class="card"><b class="num" id="conversion">—</b>Lead conversion</div></section>
 <section class="two"><div class="card"><h2>Sales Pipeline</h2><div class="pipeline"><div class="stage"><b id="newCount">—</b>New leads</div><div class="stage"><b id="qualified">—</b>Qualified</div><div class="stage"><b id="meetingCount">—</b>Meetings</div><div class="stage"><b id="proposalCount">—</b>Proposals</div><div class="stage"><b id="won">—</b>Won</div></div><h3>Institution Leads</h3><div id="leadList" class="muted">Loading live lead records…</div></div>
 <div class="card"><h2>Business Channels</h2><div class="item"><b>Schools & Institutions</b><p>Direct outreach, demonstrations and partnerships.</p></div><div class="item"><b>Digital Marketing</b><p>Search, social, content and project campaigns.</p></div><div class="item"><b>Events & Workshops</b><p>STEM events and robotics demonstrations.</p></div><div class="item"><b>Referral Partners</b><p>Teachers and education consultants.</p></div></div></section>
-<section class="card" style="margin-top:16px"><h2>Lead data status</h2><p id="dataStatus" class="muted">Connecting to RoboSprints records…</p></section><p><a href="/">← Back to RoboSprints</a></p></main>
+<section class="card" style="margin-top:16px"><h2>Purchase Manager — Part Approvals</h2><p>Review parts and proposed pricing submitted by Purchase Manager. Approved parts are activated in the student parts catalogue.</p><div id="purchasePartApprovals" class="muted">Loading pending part approvals…</div></section><section class="card" style="margin-top:16px"><h2>Lead data status</h2><p id="dataStatus" class="muted">Connecting to RoboSprints records…</p></section><p><a href="/">← Back to RoboSprints</a></p></main>
 <script>
 (()=>{
 const token=sessionStorage.getItem('robosprints_manager_token')||localStorage.getItem('robosprints_manager_token')||'';
@@ -21,12 +21,27 @@ const role=sessionStorage.getItem('robosprints_manager_role')||localStorage.getI
 if(!token||role!=='business_manager'){location.replace('/business-manager-login.html');return}
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+async function loadPurchasePartApprovals(){
+ try{
+  const r=await fetch('/api/student-profile?scope=parts&view=approval',{headers:{Authorization:'Bearer '+token}}),d=await r.json();
+  if(!r.ok)throw Error(d.error||'Could not load Purchase Manager proposals');
+  const box=$('purchasePartApprovals'),parts=d.parts||[];
+  if(!parts.length){box.textContent='No Purchase Manager part proposals are awaiting approval.';return}
+  box.innerHTML=parts.map(p=>'<div class="item"><b>'+esc(p.name)+'</b><p>'+esc(p.description||'')+'</p><p>Supplier: '+esc(p.supplier_name||'Not entered')+' · Stock: '+Number(p.stock_on_hand||0)+' · Reorder level: '+Number(p.reorder_level||0)+'</p><p>Purchase cost: ₹'+Number(p.proposed_cost_price||0).toLocaleString('en-IN')+' · Proposed sale price: ₹'+Number(p.proposed_sale_price||0).toLocaleString('en-IN')+'</p><button data-approve-part="'+p.id+'">Approve & Add to Catalogue</button><button class="secondary" data-reject-part="'+p.id+'">Reject</button></div>').join('');
+  box.querySelectorAll('[data-approve-part]').forEach(b=>b.addEventListener('click',()=>decidePurchasePart(b.dataset.approvePart,'approve_price')));
+  box.querySelectorAll('[data-reject-part]').forEach(b=>b.addEventListener('click',()=>decidePurchasePart(b.dataset.rejectPart,'reject_price')));
+ }catch(e){$('purchasePartApprovals').textContent='Part approvals could not be loaded: '+e.message}
+}
+async function decidePurchasePart(id,action){
+ if(!confirm(action==='approve_price'?'Approve this part and make it available in the student parts catalogue?':'Reject this part proposal?'))return;
+ try{const r=await fetch('/api/student-profile?scope=parts',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,part_id:id})}),d=await r.json();if(!r.ok)throw Error(d.error||'Unable to process approval');alert(d.message||'Updated');loadPurchasePartApprovals()}catch(e){alert(e.message)}
+}
 async function load(){try{
 const r=await fetch('/api/student-profile?scope=marketing',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw Error(d.error||'Unable to load marketing data');
 const s=d.summary||{},leads=d.leads||[];$('total').textContent=s.total??0;$('meetings').textContent=s.meeting??0;$('proposals').textContent=s.proposal??0;$('conversion').textContent=(s.conversion_rate??0)+'%';
 $('newCount').textContent=s.new??0;$('qualified').textContent=s.qualified??0;$('meetingCount').textContent=s.meeting??0;$('proposalCount').textContent=s.proposal??0;$('won').textContent=s.won??0;
 $('leadList').innerHTML=leads.length?leads.map(x=>'<div class="item"><b>'+esc(x.institution_name)+'</b><span class="tag">'+esc(x.status||'new')+'</span>'+(x.contact_name?'<p>Contact: '+esc(x.contact_name)+'</p>':'')+(x.city?'<p>City: '+esc(x.city)+'</p>':'')+(x.expected_students!==null&&x.expected_students!==undefined?'<p>Expected students: '+Number(x.expected_students)+'</p>':'')+(x.requirement?'<p>'+esc(x.requirement)+'</p>':'')+(x.phone?'<p>Phone: '+esc(x.phone)+'</p>':'')+'</div>').join(''):'<div class="empty">No institution leads have been recorded yet. Dashboard totals are therefore zero; no sample leads or figures are being shown.</div>';
 $('dataStatus').textContent='Live data loaded successfully · '+leads.length+' institutional lead record(s).';
-}catch(e){$('dataStatus').textContent='Live data could not be loaded: '+e.message;$('leadList').innerHTML='<div class="empty">Unable to load real lead records. Please check your login and refresh.</div>';$('total').textContent='—';$('meetings').textContent='—';$('proposals').textContent='—';$('conversion').textContent='—'}}load();
+}catch(e){$('dataStatus').textContent='Live data could not be loaded: '+e.message;$('leadList').innerHTML='<div class="empty">Unable to load real lead records. Please check your login and refresh.</div>';$('total').textContent='—';$('meetings').textContent='—';$('proposals').textContent='—';$('conversion').textContent='—'}}load();loadPurchasePartApprovals();
 })();
 </script></body></html>
