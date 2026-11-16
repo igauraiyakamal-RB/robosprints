@@ -27,6 +27,37 @@ module.exports=async(req,res)=>{
     if(qq)path+='&name=ilike.*'+encodeURIComponent(qq)+'*';return res.json({success:true,parts:await q(path+'&order=name.asc')});
    }
    const b=req.body||{};
+   if(req.method==='POST'&&b.action==='review_project_change_request'){
+    if(actor.role!=='project_manager'||actor.approval_status!=='approved')return res.status(403).json({error:'Approved Project Manager access required.'});
+    const requestId=String(b.request_id||'');
+    const change=(await q('/rest/v1/project_change_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,project_id,mentor_id,request_type,proposed_data,status'))[0];
+    if(!change||change.status!=='pending')return res.status(404).json({error:'Pending project change request not found.'});
+    if(b.approve!==true){
+     await q('/rest/v1/project_change_requests?id=eq.'+encodeURIComponent(requestId),{method:'PATCH',body:JSON.stringify({status:'rejected',reviewed_at:new Date().toISOString(),reviewed_by:user.id})});
+     return res.json({success:true,status:'rejected'});
+    }
+    if(change.request_type==='delete'){
+     await q('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(change.project_id),{method:'DELETE'});
+     await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(change.project_id),{method:'DELETE'});
+     await q('/rest/v1/projects?id=eq.'+encodeURIComponent(change.project_id),{method:'DELETE'});
+    }else if(change.request_type==='edit'){
+     const data=change.proposed_data||{},project={...(data.project||{})};delete project.mentor_id;delete project.id;
+     if(Object.keys(project).length)await q('/rest/v1/projects?id=eq.'+encodeURIComponent(change.project_id),{method:'PATCH',body:JSON.stringify(project)});
+     const parts=Array.isArray(data.parts)?data.parts:[];
+     if(parts.length>40)return res.status(400).json({error:'A project can contain at most 40 parts.'});
+     const normalized=parts.map((x,i)=>({name:String(x.name||'').trim(),description:String(x.description||'').trim()||null,quantity:Math.max(1,Math.min(999,Number(x.quantity)||1)),sort_order:i})).filter(x=>x.name);
+     await q('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(change.project_id),{method:'DELETE'});
+     await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(change.project_id),{method:'DELETE'});
+     if(normalized.length){
+      const catalog=await q('/rest/v1/parts_catalog?active=eq.true&select=id,name&order=name.asc');
+      const byName=Object.fromEntries(catalog.map(x=>[String(x.name||'').trim().toLowerCase(),x.id]));
+      await q('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(normalized.map(x=>({project_id:change.project_id,name:x.name,description:x.description,sort_order:x.sort_order,price:0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]||null})))});
+      await q('/rest/v1/part_requirements',{method:'POST',body:JSON.stringify(normalized.map(x=>({mentor_id:change.mentor_id,project_id:change.project_id,requested_name:x.name,specification:x.description,quantity:x.quantity,status:byName[x.name.toLowerCase()]?'catalog_available':'pending_purchase'})))});
+     }
+    }else return res.status(400).json({error:'Unsupported project change request type.'});
+    await q('/rest/v1/project_change_requests?id=eq.'+encodeURIComponent(requestId),{method:'PATCH',body:JSON.stringify({status:'approved',reviewed_at:new Date().toISOString(),reviewed_by:user.id})});
+    return res.json({success:true,status:'approved'});
+   }
    if(req.method==='POST'&&b.action==='save_project_parts'){
     if(actor.role!=='mentor'||actor.approval_status!=='approved')return res.status(403).json({error:'Approved Mentor access required.'});
     const projectId=String(b.project_id||'');
