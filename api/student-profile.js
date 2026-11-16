@@ -88,6 +88,14 @@ module.exports=async(req,res)=>{
    if(req.method==='PATCH'&&b.action==='approve_price'){if(actor.role!=='business_manager')return res.status(403).json({error:'Business Manager approval required.'});const part=(await q('/rest/v1/parts_catalog?id=eq.'+encodeURIComponent(b.part_id)+'&select=proposed_cost_price,proposed_sale_price'))[0];if(!part||Number(part.proposed_sale_price)<=Number(part.proposed_cost_price))return res.status(400).json({error:'Sale price must be greater than cost price.'});await q('/rest/v1/parts_catalog?id=eq.'+encodeURIComponent(b.part_id),{method:'PATCH',body:JSON.stringify({cost_price:part.proposed_cost_price,sale_price:part.proposed_sale_price,price:part.proposed_sale_price,pricing_status:'approved',active:true,approved_by:actor.id,approved_at:new Date().toISOString()})});return res.json({success:true,message:'Price approved and live.'})}
    return res.status(405).json({error:'Method not allowed'});
   }
+  if(scope==='marketing'){
+   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
+   if(actor.role!=='business_manager'||actor.approval_status!=='approved')return res.status(403).json({error:'Approved Business Manager access required.'});
+   const leads=await q('/rest/v1/institutional_leads?select=id,institution_name,contact_name,email,phone,city,requirement,expected_students,status,created_at,updated_at&order=created_at.desc');
+   const countStatus=(s)=>leads.filter(x=>String(x.status||'new').toLowerCase()===s).length;
+   const total=leads.length,won=countStatus('won');
+   return res.json({success:true,leads,summary:{total,new:countStatus('new'),qualified:countStatus('qualified'),meeting:countStatus('meeting'),proposal:countStatus('proposal'),won,conversion_rate:total?Math.round(won/total*100):0}});
+  }
   if(scope==='analytics'){
    if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
    if(!['business_manager','accounts_manager'].includes(actor.role))return res.status(403).json({error:'Business or Accounts Manager access required.'});
