@@ -21,7 +21,7 @@ function verifyPayment(body){
 async function attachValidProjectJourney(studentId,projectId,studentPhone){
   if(!projectId)return null;
   // A stale project id must never roll back an already verified membership.
-  const projects=await sb('/rest/v1/projects?id=eq.'+encodeURIComponent(projectId)+'&select=id&limit=1');
+  const projects=await sb('/rest/v1/projects?id=eq.'+encodeURIComponent(projectId)+'&status=eq.published&select=id&limit=1');
   if(!projects||!projects.length){console.warn('Membership project link skipped: project does not exist',projectId);return null;}
   const journeys=await sb('/rest/v1/student_project_journeys?student_id=eq.'+encodeURIComponent(studentId)+'&project_id=eq.'+encodeURIComponent(projectId)+'&select=id&limit=1');
   if(!journeys.length){
@@ -38,12 +38,12 @@ async function ensureMembershipTransaction(membership,student,plan,amount,paymen
   });
   return rows&&rows[0];
 }
-async function syncProfileMembership(profileId,membershipId,plan,student){
+async function syncProfileMembership(profileId,membershipId,plan,student,preserve={}){
   const rows=await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(profileId),{
     method:'PATCH',headers:{Prefer:'return=representation'},
     body:JSON.stringify({
       membership_id:membershipId,membership_status:'active',approval_status:'approved',
-      membership_started_at:new Date().toISOString(),membership_expires_at:expiryFor(plan),
+      membership_started_at:preserve.membership_started_at||new Date().toISOString(),membership_expires_at:preserve.membership_expires_at||expiryFor(plan),
       full_name:student.fullName,phone:student.phone,whatsapp_no:student.phone,
       city:student.city||null,profile_completed:true,updated_at:new Date().toISOString()
     })
@@ -70,12 +70,15 @@ module.exports=async(req,res)=>{
       const profiles=await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(m.user_id)+'&select=*');
       const profile=profiles&&profiles[0];
       if(!profile)throw new Error('Paid membership exists but its student profile is missing');
-      await syncProfileMembership(profile.id,m.membership_id||('RS-'+Date.now()),m.plan_name||plan,student);
+      await syncProfileMembership(profile.id,m.membership_id||('RS-'+Date.now()),m.plan_name||plan,student,profile);
       try{await ensureMembershipTransaction(m,student,m.plan_name||plan,m.amount||amount,razorpay_payment_id);}catch(e){console.error('Membership transaction repair warning:',e.message);}
       let linkedProject=null;
       try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
-      return res.status(200).json({success:true,already_processed:true,membership_id:m.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/student-dashboard.html'});
+      return res.status(200).json({success:true,already_processed:true,membership_id:m.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/#projects'});
     }
+
+    const expectedPrices={'1 Month':99,'3 Months':450,'6 Months':750,'Full Year':999};
+    if(!Object.prototype.hasOwnProperty.call(expectedPrices,plan)||Number(amount)!==expectedPrices[plan])return res.status(400).json({error:'Membership plan amount does not match the current published price.'});
 
     const email=String(student.email).trim().toLowerCase();
     let profiles=await sb('/rest/v1/user_profiles?email=eq.'+encodeURIComponent(email)+'&select=*');
@@ -124,7 +127,7 @@ module.exports=async(req,res)=>{
       }
     }catch(e){console.error('Notification warning:',e.message);}
 
-    return res.status(200).json({success:true,membership_id:membership.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/student-dashboard.html'});
+    return res.status(200).json({success:true,membership_id:membership.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/#projects'});
   }catch(e){
     console.error('Membership completion failed:',e.message);
     return res.status(500).json({error:'Payment was verified, but membership activation needs attention. Please contact RoboSprints support with your payment ID.'});
