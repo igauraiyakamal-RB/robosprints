@@ -10,7 +10,7 @@ module.exports=async(q,r)=>{
   try{const a=await fetch(U+'/auth/v1/verify',{method:'POST',headers:adminHeaders,body:JSON.stringify({email,token,type:'email'})}),d=await a.json();if(!a.ok||!d.user?.id)throw Error('Invalid or expired verification code.');const uid=d.user.id;
    const m=await fetch(U+'/rest/v1/memberships?user_id=eq.'+encodeURIComponent(uid)+'&status=eq.active&limit=1&select=membership_id',{headers:adminHeaders}).then(x=>x.json());if(!m.length)return r.status(403).json({error:'No active RoboSprints membership was found.'});
    const j=await fetch(U+'/rest/v1/student_project_journeys?student_id=eq.'+encodeURIComponent(uid)+'&order=updated_at.desc&limit=1&select=project_id,current_stage',{headers:adminHeaders}).then(x=>x.json());const z=j[0];
-   return r.json({success:true,membership_id:m[0].membership_id,access_token:d.access_token||d.session?.access_token||null,journey_url:z?.project_id?'/student-dashboard.html?project='+encodeURIComponent(z.project_id):'/'});
+   return r.json({success:true,membership_id:m[0].membership_id,access_token:d.access_token||d.session?.access_token||null,journey_url:z?.project_id?'/student-dashboard.html?project='+encodeURIComponent(z.project_id):'/#projects'});
   }catch(e){return r.status(400).json({error:e.message||'Login could not be completed.'});}
  }
  if(q.method!=='POST')return r.status(405).json({error:'Method not allowed'});
