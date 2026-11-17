@@ -54,10 +54,10 @@ module.exports=async(req,res)=>{
      await q('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(change.project_id),{method:'DELETE'});
      await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(change.project_id),{method:'DELETE'});
      if(normalized.length){
-      const catalog=await q('/rest/v1/parts_catalog?active=eq.true&select=id,name&order=name.asc');
-      const byName=Object.fromEntries(catalog.map(x=>[String(x.name||'').trim().toLowerCase(),x.id]));
-     unmatchedCount=normalized.filter(x=>!byName[x.name.toLowerCase()]).length;
-      await q('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(normalized.map(x=>({project_id:change.project_id,name:x.name,description:x.description,quantity:x.quantity,sort_order:x.sort_order,price:0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]||null})))});
+      const catalog=await q('/rest/v1/parts_catalog?active=eq.true&select=id,name,sale_price,price&order=name.asc');
+      const byName=Object.fromEntries(catalog.map(x=>[String(x.name||'').trim().toLowerCase(),{id:x.id,price:Number(x.sale_price||x.price||0)}]));
+      const unmatchedCount=normalized.filter(x=>!byName[x.name.toLowerCase()]).length;
+      await q('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(normalized.map(x=>({project_id:change.project_id,name:x.name,description:x.description,quantity:x.quantity,sort_order:x.sort_order,price:byName[x.name.toLowerCase()]?.price||0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]?.id||null})))});
       await q('/rest/v1/part_requirements',{method:'POST',body:JSON.stringify(normalized.map(x=>({mentor_id:change.mentor_id,project_id:change.project_id,requested_name:x.name,specification:x.description,quantity:x.quantity,status:byName[x.name.toLowerCase()]?'approved':'pending_purchase'})))});
      }
     }else return res.status(400).json({error:'Unsupported project change request type.'});
@@ -76,9 +76,9 @@ module.exports=async(req,res)=>{
     await q('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(projectId),{method:'DELETE'});
     let unmatchedCount=0;
     if(normalized.length){
-     const catalog=await q('/rest/v1/parts_catalog?active=eq.true&select=id,name&order=name.asc');
-     const byName=Object.fromEntries(catalog.map(x=>[String(x.name||'').trim().toLowerCase(),x.id]));
-     const rows=normalized.map(x=>({project_id:projectId,name:x.name,description:x.description,quantity:x.quantity,sort_order:x.sort_order,price:0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]||null}));
+     const catalog=await q('/rest/v1/parts_catalog?active=eq.true&select=id,name,sale_price,price&order=name.asc');
+     const byName=Object.fromEntries(catalog.map(x=>[String(x.name||'').trim().toLowerCase(),{id:x.id,price:Number(x.sale_price||x.price||0)}]));
+     const rows=normalized.map(x=>({project_id:projectId,name:x.name,description:x.description,quantity:x.quantity,sort_order:x.sort_order,price:byName[x.name.toLowerCase()]?.price||0,is_core:true,catalog_part_id:byName[x.name.toLowerCase()]?.id||null}));
      await q('/rest/v1/project_parts',{method:'POST',body:JSON.stringify(rows)});
      await q('/rest/v1/part_requirements?project_id=eq.'+encodeURIComponent(projectId),{method:'DELETE'});
      await q('/rest/v1/part_requirements',{method:'POST',body:JSON.stringify(normalized.map(x=>({mentor_id:user.id,project_id:projectId,requested_name:x.name,specification:x.description,quantity:x.quantity,status:byName[x.name.toLowerCase()]?'approved':'pending_purchase'})))});
