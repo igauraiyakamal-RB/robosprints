@@ -81,9 +81,9 @@ module.exports=async(req,res)=>{
       if(!profile)throw new Error('Paid membership exists but its student profile is missing');
       await syncProfileMembership(profile.id,m.membership_id||('RS-'+Date.now()),m.plan_name||plan,student,profile);
       try{await ensureMembershipTransaction(m,student,m.plan_name||plan,m.amount||amount,razorpay_payment_id);}catch(e){console.error('Membership transaction repair warning:',e.message);}
-      let linkedProject=null;
-      try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
-      return res.status(200).json({success:true,already_processed:true,membership_id:m.membership_id||profile.membership_id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/#projects'});
+      // Membership activation and project selection are separate steps. Do not create a journey until the student explicitly starts a project.
+      const linkedProject=null;
+      return res.status(200).json({success:true,already_processed:true,membership_id:m.membership_id||profile.membership_id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/student-projects.html'});
     }
 
     const expectedPrices={'1 Month':99,'3 Months':450,'6 Months':750,'Full Year':999};
@@ -122,8 +122,8 @@ module.exports=async(req,res)=>{
     if(!membership)throw new Error('Membership record could not be created');
 
     await syncProfileMembership(profile.id,membershipId,plan,student);
-    let linkedProject=null;
-    try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
+    // Membership activation and project selection are separate steps. Do not create a journey until the student explicitly starts a project.
+    const linkedProject=null;
 
     // Reporting and notifications must never block an already activated student.
     try{await ensureMembershipTransaction(membership,student,plan,amount,razorpay_payment_id);}catch(e){console.error('Business transaction warning:',e.message);}
