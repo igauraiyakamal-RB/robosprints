@@ -112,18 +112,20 @@ module.exports=async(req,res)=>{
     return res.json({success:true,order:rows[0]});
    }
    if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
-   const [memberships,orders,items,students,projects]=await Promise.all([
+   const [memberships,orders,items,students,projects,journeys,leads]=await Promise.all([
     q('/rest/v1/memberships?razorpay_payment_id=not.is.null&select=id,user_id,plan_name,amount,created_at,razorpay_payment_id'),
     q('/rest/v1/orders?status=in.(paid,paid_pending_dispatch,processing,dispatched,delivered)&select=id,student_id,project_id,total,status,delivery_address,phone,paid_at,razorpay_payment_id,created_at,updated_at&order=created_at.desc'),
     q('/rest/v1/order_items?select=order_id,part_id,name,quantity,unit_price'),
     q('/rest/v1/user_profiles?role=eq.student&select=id,full_name,email,phone'),
-    q('/rest/v1/projects?select=id,title')
+    q('/rest/v1/projects?select=id,title'),
+    q('/rest/v1/student_project_journeys?select=id'),
+    q('/rest/v1/institutional_leads?select=id')
    ]);
    const ids=[...new Set(items.map(i=>i.part_id).filter(Boolean))],parts=ids.length?await q('/rest/v1/parts_catalog?id=in.('+ids.join(',')+')&select=id,cost_price'):[],costs=Object.fromEntries(parts.map(x=>[x.id,Number(x.cost_price||0)]));
    const mc=memberships.reduce((s,x)=>s+Number(x.amount||0),0),pc=orders.reduce((s,x)=>s+Number(x.total||0),0),cost=items.reduce((s,x)=>s+Number(x.quantity||0)*costs[x.part_id],0);
    const studentMap=Object.fromEntries(students.map(x=>[x.id,x])),projectMap=Object.fromEntries(projects.map(x=>[x.id,x]));
    const detailedOrders=orders.map(o=>({...o,student:studentMap[o.student_id]||null,project:projectMap[o.project_id]||null,items:items.filter(i=>i.order_id===o.id)}));
-   return res.json({success:true,summary:{membership_collection:mc,membership_count:memberships.length,parts_collection:pc,parts_order_count:orders.length,total_gross_collection:mc+pc,estimated_parts_cost:cost,estimated_parts_gross_profit:pc-cost},memberships,orders:detailedOrders});
+   return res.json({success:true,summary:{membership_collection:mc,membership_count:memberships.length,parts_collection:pc,parts_order_count:orders.length,total_gross_collection:mc+pc,estimated_parts_cost:cost,estimated_parts_gross_profit:pc-cost,journey_count:journeys.length,project_count:projects.length,institutional_lead_count:leads.length},memberships,orders:detailedOrders});
   }
   if(req.method==='PATCH'){
    const body=req.body||{},update={};for(const f of fields)if(Object.prototype.hasOwnProperty.call(body,f))update[f]=String(body[f]||'').trim()||null;
