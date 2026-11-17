@@ -29,6 +29,15 @@ async function attachValidProjectJourney(studentId,projectId,studentPhone){
   }
   return projectId;
 }
+async function ensureMembershipTransaction(membership,student,plan,amount,paymentId){
+  const existing=await sb('/rest/v1/business_transactions?payment_reference=eq.'+encodeURIComponent(paymentId)+'&select=id&limit=1');
+  if(existing&&existing.length)return existing[0];
+  const rows=await sb('/rest/v1/business_transactions',{
+    method:'POST',headers:{Prefer:'return=representation'},
+    body:JSON.stringify({transaction_type:'income',category:'membership',source_type:'membership',source_id:membership.id,description:'RoboSprints '+plan+' membership - '+student.fullName,gross_amount:Number(amount),discount_amount:0,net_amount:Number(amount),status:'recorded',payment_reference:paymentId})
+  });
+  return rows&&rows[0];
+}
 async function syncProfileMembership(profileId,membershipId,plan,student){
   const rows=await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(profileId),{
     method:'PATCH',headers:{Prefer:'return=representation'},
@@ -62,6 +71,7 @@ module.exports=async(req,res)=>{
       const profile=profiles&&profiles[0];
       if(!profile)throw new Error('Paid membership exists but its student profile is missing');
       await syncProfileMembership(profile.id,m.membership_id||('RS-'+Date.now()),m.plan_name||plan,student);
+      try{await ensureMembershipTransaction(m,student,m.plan_name||plan,m.amount||amount,razorpay_payment_id);}catch(e){console.error('Membership transaction repair warning:',e.message);}
       let linkedProject=null;
       try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
       return res.status(200).json({success:true,already_processed:true,membership_id:m.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/student-dashboard.html'});
@@ -103,7 +113,7 @@ module.exports=async(req,res)=>{
     try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
 
     // Reporting and notifications must never block an already activated student.
-    try{await sb('/rest/v1/business_transactions',{method:'POST',body:JSON.stringify({transaction_type:'income',category:'membership',source_type:'membership',source_id:membership.id,description:'RoboSprints '+plan+' membership - '+student.fullName,gross_amount:Number(amount),discount_amount:0,net_amount:Number(amount),status:'recorded',payment_reference:razorpay_payment_id})});}catch(e){console.error('Business transaction warning:',e.message);}
+    try{await ensureMembershipTransaction(membership,student,plan,amount,razorpay_payment_id);}catch(e){console.error('Business transaction warning:',e.message);}
     try{
       const recipients=await sb('/rest/v1/user_profiles?role=in.(project_manager,accounts_manager,business_manager,admin)&approval_status=eq.approved&select=id,role');
       let mentorId=null,projectTitle='';
