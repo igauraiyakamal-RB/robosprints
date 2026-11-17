@@ -1,4 +1,5 @@
 const crypto=require('crypto');
+const Razorpay=require('razorpay');
 
 const SB_URL=process.env.SUPABASE_URL||process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -11,6 +12,14 @@ async function sb(path,opt={}){
   return data;
 }
 function expiryFor(plan){const d=new Date(); if(plan==='1 Month')d.setMonth(d.getMonth()+1); else if(plan==='3 Months')d.setMonth(d.getMonth()+3); else if(plan==='6 Months')d.setMonth(d.getMonth()+6); else d.setFullYear(d.getFullYear()+1); return d.toISOString();}
+async function verifyRazorpayOrderPayment(orderId,paymentId,expectedPaise,plan){
+  const razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
+  const [order,payment]=await Promise.all([razorpay.orders.fetch(orderId),razorpay.payments.fetch(paymentId)]);
+  if(Number(order.amount)!==Number(expectedPaise)||order.currency!=='INR'||order.status!=='paid'||order.notes?.plan!==plan)
+    throw new Error('Razorpay order does not match the selected membership plan and amount.');
+  if(payment.order_id!==orderId||Number(payment.amount)!==Number(expectedPaise)||payment.currency!=='INR'||payment.status!=='captured')
+    throw new Error('Razorpay payment is not captured for the expected order amount.');
+}
 function verifyPayment(body){
   const {razorpay_payment_id,razorpay_order_id,razorpay_signature}=body;
   if(!process.env.RAZORPAY_KEY_SECRET)return false;
@@ -79,6 +88,7 @@ module.exports=async(req,res)=>{
 
     const expectedPrices={'1 Month':99,'3 Months':450,'6 Months':750,'Full Year':999};
     if(!Object.prototype.hasOwnProperty.call(expectedPrices,plan)||Number(amount)!==expectedPrices[plan])return res.status(400).json({error:'Membership plan amount does not match the current published price.'});
+    await verifyRazorpayOrderPayment(razorpay_order_id,razorpay_payment_id,expectedPrices[plan]*100,plan);
 
     const email=String(student.email).trim().toLowerCase();
     let profiles=await sb('/rest/v1/user_profiles?email=eq.'+encodeURIComponent(email)+'&select=*');
