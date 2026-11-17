@@ -43,7 +43,7 @@ main{padding:0 0 70px}.plans{display:grid;grid-template-columns:repeat(4,minmax(
 </section>
 </div></main>
 <script>
-let selected={name:"1 Month",price:199,duration:"1 month"};
+let selected={name:"1 Month",price:99,duration:"1 month"};
 const cards=[...document.querySelectorAll(".plan")];
 function choose(card){cards.forEach(c=>{c.classList.toggle("selected",c===card);c.querySelector(".choose").textContent=c===card?"Selected plan":"Choose this plan"});selected={name:card.dataset.plan,price:Number(card.dataset.price),duration:card.dataset.duration};document.getElementById("sumPlan").textContent=selected.name;document.getElementById("sumDuration").textContent=selected.duration;document.getElementById("sumPrice").textContent="₹"+selected.price}
 cards.forEach(card=>{card.addEventListener("click",()=>choose(card));card.querySelector("button").addEventListener("click",e=>{e.stopPropagation();choose(card)})});
