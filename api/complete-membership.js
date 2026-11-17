@@ -74,7 +74,7 @@ module.exports=async(req,res)=>{
       try{await ensureMembershipTransaction(m,student,m.plan_name||plan,m.amount||amount,razorpay_payment_id);}catch(e){console.error('Membership transaction repair warning:',e.message);}
       let linkedProject=null;
       try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
-      return res.status(200).json({success:true,already_processed:true,membership_id:m.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/#projects'});
+      return res.status(200).json({success:true,already_processed:true,membership_id:m.membership_id||profile.membership_id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/#projects'});
     }
 
     const expectedPrices={'1 Month':99,'3 Months':450,'6 Months':750,'Full Year':999};
@@ -127,7 +127,7 @@ module.exports=async(req,res)=>{
       }
     }catch(e){console.error('Notification warning:',e.message);}
 
-    return res.status(200).json({success:true,membership_id:membership.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/#projects'});
+    return res.status(200).json({success:true,membership_id:membership.membership_id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/#projects'});
   }catch(e){
     console.error('Membership completion failed:',e.message);
     return res.status(500).json({error:'Payment was verified, but membership activation needs attention. Please contact RoboSprints support with your payment ID.'});
