@@ -18,6 +18,30 @@ function verifyPayment(body){
   const a=Buffer.from(String(razorpay_signature),'utf8'),b=Buffer.from(generated,'utf8');
   return a.length===b.length&&crypto.timingSafeEqual(a,b);
 }
+async function attachValidProjectJourney(studentId,projectId,studentPhone){
+  if(!projectId)return null;
+  // A stale project id must never roll back an already verified membership.
+  const projects=await sb('/rest/v1/projects?id=eq.'+encodeURIComponent(projectId)+'&select=id&limit=1');
+  if(!projects||!projects.length){console.warn('Membership project link skipped: project does not exist',projectId);return null;}
+  const journeys=await sb('/rest/v1/student_project_journeys?student_id=eq.'+encodeURIComponent(studentId)+'&project_id=eq.'+encodeURIComponent(projectId)+'&select=id&limit=1');
+  if(!journeys.length){
+    await sb('/rest/v1/student_project_journeys',{method:'POST',body:JSON.stringify({student_id:studentId,project_id:projectId,current_stage:1,phone:studentPhone||null,membership_status:'active'})});
+  }
+  return projectId;
+}
+async function syncProfileMembership(profileId,membershipId,plan,student){
+  const rows=await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(profileId),{
+    method:'PATCH',headers:{Prefer:'return=representation'},
+    body:JSON.stringify({
+      membership_id:membershipId,membership_status:'active',approval_status:'approved',
+      membership_started_at:new Date().toISOString(),membership_expires_at:expiryFor(plan),
+      full_name:student.fullName,phone:student.phone,whatsapp_no:student.phone,
+      city:student.city||null,profile_completed:true,updated_at:new Date().toISOString()
+    })
+  });
+  if(!rows||!rows.length)throw new Error('Student profile membership details could not be saved');
+  return rows[0];
+}
 
 module.exports=async(req,res)=>{
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
@@ -29,10 +53,18 @@ module.exports=async(req,res)=>{
     if(!verifyPayment({razorpay_payment_id,razorpay_order_id,razorpay_signature}))
       return res.status(400).json({error:'Payment signature verification failed'});
 
+    // Idempotency: a retry after a partial failure repairs the profile and project link
+    // instead of attempting to charge or create a duplicate membership.
     const existing=await sb('/rest/v1/memberships?razorpay_payment_id=eq.'+encodeURIComponent(razorpay_payment_id)+'&select=*');
     if(existing&&existing.length){
       const m=existing[0];
-      return res.status(200).json({success:true,already_processed:true,membership_id:m.id,student_id:m.user_id,project_id:project_id||null,journey_url:project_id?'/student-dashboard.html?project='+encodeURIComponent(project_id):'/student-dashboard.html'});
+      const profiles=await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(m.user_id)+'&select=*');
+      const profile=profiles&&profiles[0];
+      if(!profile)throw new Error('Paid membership exists but its student profile is missing');
+      await syncProfileMembership(profile.id,m.membership_id||('RS-'+Date.now()),m.plan_name||plan,student);
+      let linkedProject=null;
+      try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
+      return res.status(200).json({success:true,already_processed:true,membership_id:m.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/student-dashboard.html'});
     }
 
     const email=String(student.email).trim().toLowerCase();
@@ -43,38 +75,46 @@ module.exports=async(req,res)=>{
       const tempPassword=crypto.randomBytes(24).toString('base64url')+'Aa1!';
       const created=await sb('/auth/v1/admin/users',{method:'POST',body:JSON.stringify({email,password:tempPassword,email_confirm:true,user_metadata:{full_name:student.fullName,phone:student.phone}})});
       const uid=created.id;
-      const rows=await sb('/rest/v1/user_profiles?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({id:uid,full_name:student.fullName,email,phone:student.phone,whatsapp_no:student.phone,city:student.city||null,role:'student',approval_status:'approved',membership_status:'active',membership_started_at:new Date().toISOString(),membership_expires_at:expiryFor(plan),profile_completed:true})});
+      const rows=await sb('/rest/v1/user_profiles?on_conflict=id',{
+        method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},
+        body:JSON.stringify({id:uid,full_name:student.fullName,email,phone:student.phone,whatsapp_no:student.phone,city:student.city||null,role:'student',approval_status:'approved',membership_status:'active',membership_started_at:new Date().toISOString(),membership_expires_at:expiryFor(plan),profile_completed:true})
+      });
       profile=rows&&rows[0];
       if(!profile){const check=await sb('/rest/v1/user_profiles?id=eq.'+uid+'&select=*');profile=check[0];}
     }else{
-      const rows=await sb('/rest/v1/user_profiles?id=eq.'+profile.id,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({full_name:student.fullName,phone:student.phone,whatsapp_no:student.phone,city:student.city||profile.city||null,approval_status:'approved',membership_status:'active',membership_started_at:new Date().toISOString(),membership_expires_at:expiryFor(plan),profile_completed:true,updated_at:new Date().toISOString()})});
+      const rows=await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(profile.id),{
+        method:'PATCH',headers:{Prefer:'return=representation'},
+        body:JSON.stringify({full_name:student.fullName,phone:student.phone,whatsapp_no:student.phone,city:student.city||profile.city||null,approval_status:'approved',membership_status:'active',membership_started_at:new Date().toISOString(),membership_expires_at:expiryFor(plan),profile_completed:true,updated_at:new Date().toISOString()})
+      });
       profile=rows&&rows[0]||profile;
     }
     if(!profile||!profile.id)throw new Error('Student profile could not be created');
 
-    const membershipRows=await sb('/rest/v1/memberships',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({user_id:profile.id,membership_id:'RS-'+Date.now(),plan_name:plan,amount:Number(amount),currency:'INR',status:'active',payment_provider:'razorpay',razorpay_order_id,razorpay_payment_id,transaction_id:razorpay_payment_id,activated_at:new Date().toISOString()})});
-    const membership=membershipRows[0];
+    const membershipId='RS-'+Date.now();
+    const membershipRows=await sb('/rest/v1/memberships',{
+      method:'POST',headers:{Prefer:'return=representation'},
+      body:JSON.stringify({user_id:profile.id,membership_id:membershipId,plan_name:plan,amount:Number(amount),currency:'INR',status:'active',payment_provider:'razorpay',razorpay_order_id,razorpay_payment_id,transaction_id:razorpay_payment_id,activated_at:new Date().toISOString()})
+    });
+    const membership=membershipRows&&membershipRows[0];
     if(!membership)throw new Error('Membership record could not be created');
 
-    if(project_id){
-      const journeys=await sb('/rest/v1/student_project_journeys?student_id=eq.'+profile.id+'&project_id=eq.'+project_id+'&select=id');
-      if(!journeys.length)await sb('/rest/v1/student_project_journeys',{method:'POST',body:JSON.stringify({student_id:profile.id,project_id,current_stage:1,phone:student.phone,membership_status:'active'})});
-    }
+    await syncProfileMembership(profile.id,membershipId,plan,student);
+    let linkedProject=null;
+    try{linkedProject=await attachValidProjectJourney(profile.id,project_id,student.phone);}catch(e){console.error('Project journey warning:',e.message);}
 
-    // Core membership is complete. Business reporting and notifications must never block the student's journey.
+    // Reporting and notifications must never block an already activated student.
     try{await sb('/rest/v1/business_transactions',{method:'POST',body:JSON.stringify({transaction_type:'income',category:'membership',source_type:'membership',source_id:membership.id,description:'RoboSprints '+plan+' membership - '+student.fullName,gross_amount:Number(amount),discount_amount:0,net_amount:Number(amount),status:'recorded',payment_reference:razorpay_payment_id})});}catch(e){console.error('Business transaction warning:',e.message);}
-
     try{
       const recipients=await sb('/rest/v1/user_profiles?role=in.(project_manager,accounts_manager,business_manager,admin)&approval_status=eq.approved&select=id,role');
       let mentorId=null,projectTitle='';
-      if(project_id){const pr=await sb('/rest/v1/projects?id=eq.'+project_id+'&select=mentor_id,title');if(pr[0]){mentorId=pr[0].mentor_id;projectTitle=pr[0].title||'';}}
+      if(linkedProject){const pr=await sb('/rest/v1/projects?id=eq.'+encodeURIComponent(linkedProject)+'&select=mentor_id,title');if(pr[0]){mentorId=pr[0].mentor_id;projectTitle=pr[0].title||'';}}
       if(mentorId)recipients.push({id:mentorId,role:'mentor'});
       for(const x of recipients.filter(x=>x.id)){
         await sb('/rest/v1/notifications',{method:'POST',body:JSON.stringify({user_id:x.id,title:x.role==='mentor'?'New student assigned to your project':'New membership payment received',message:x.role==='mentor'?student.fullName+' has joined '+projectTitle+'.':student.fullName+' purchased the '+plan+' plan for ₹'+Number(amount)+'.',type:'payment'})});
       }
     }catch(e){console.error('Notification warning:',e.message);}
 
-    return res.status(200).json({success:true,membership_id:membership.id,student_id:profile.id,project_id:project_id||null,journey_url:project_id?'/student-dashboard.html?project='+encodeURIComponent(project_id):'/student-dashboard.html'});
+    return res.status(200).json({success:true,membership_id:membership.id,student_id:profile.id,project_id:linkedProject,journey_url:linkedProject?'/student-dashboard.html?project='+encodeURIComponent(linkedProject):'/student-dashboard.html'});
   }catch(e){
     console.error('Membership completion failed:',e.message);
     return res.status(500).json({error:'Payment was verified, but membership activation needs attention. Please contact RoboSprints support with your payment ID.'});
