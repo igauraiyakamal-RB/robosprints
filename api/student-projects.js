@@ -9,7 +9,7 @@ async function read(path){
 module.exports=async(req,res)=>{
  if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
  if(!U||!K)return res.status(500).json({error:'Project catalogue is not configured.'});
- const token=String(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
+ const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
  if(!token)return res.status(401).json({error:'Please log in to view your projects.'});
  try{
   const auth=await fetch(U+'/auth/v1/user',{headers:{apikey:K,Authorization:'Bearer '+token}});
