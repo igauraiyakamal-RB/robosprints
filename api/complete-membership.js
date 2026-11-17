@@ -103,7 +103,7 @@ module.exports=async(req,res)=>{
     }
     if(!profile||!profile.id)throw new Error('Student profile could not be created');
 
-    const membershipId='RS-'+Date.now();
+    const phoneDigits=String(student.phone||'').replace(/\\D/g,'').slice(-10);const membershipId='RS-'+phoneDigits+'-'+Date.now();
     const membershipRows=await sb('/rest/v1/memberships',{
       method:'POST',headers:{Prefer:'return=representation'},
       body:JSON.stringify({user_id:profile.id,membership_id:membershipId,plan_name:plan,amount:Number(amount),currency:'INR',status:'active',payment_provider:'razorpay',razorpay_order_id,razorpay_payment_id,transaction_id:razorpay_payment_id,activated_at:new Date().toISOString()})
