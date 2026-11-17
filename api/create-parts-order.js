@@ -13,12 +13,12 @@ module.exports=async(req,res)=>{
   if(!ur.ok||!user?.id)return res.status(401).json({error:'Please log in again before payment.'});
   const profile=(await sb('/rest/v1/user_profiles?id=eq.'+encodeURIComponent(user.id)+'&select=role,membership_status'))[0];
   if(!profile||profile.role!=='student'||profile.membership_status!=='active')return res.status(403).json({error:'An active student membership is required.'});
-  const parts=await sb('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(project_id)+'&order=sort_order.asc&select=id,name,price');
+  const parts=await sb('/rest/v1/project_parts?project_id=eq.'+encodeURIComponent(project_id)+'&order=sort_order.asc&select=id,name,price,quantity');
   const indexes=[...new Set(missing.map(Number).filter(i=>Number.isInteger(i)&&i>=0&&i<parts.length))];
   if(!indexes.length)return res.status(400).json({error:'Please select at least one missing part.'});
   const items=indexes.map(i=>parts[i]);
   if(items.some(p=>!Number.isFinite(Number(p.price))||Number(p.price)<=0))return res.status(409).json({error:'One or more selected parts are awaiting approved pricing. Please remove those parts and try again after the Project Manager approves their prices.'});
-  const total=items.reduce((s,p)=>s+Number(p.price),0),amount=Math.round(total*100);
+  const total=items.reduce((s,p)=>s+Number(p.price)*Number(p.quantity||1),0),amount=Math.round(total*100);
   if(!Number.isInteger(amount)||amount<100)return res.status(400).json({error:'The selected parts do not have a valid price.'});
 
   // Create the business order before opening Razorpay. This gives every checkout
@@ -32,7 +32,7 @@ module.exports=async(req,res)=>{
    await sb('/rest/v1/order_items?order_id=eq.'+encodeURIComponent(order.id),{method:'DELETE'});
    await sb('/rest/v1/orders?id=eq.'+encodeURIComponent(order.id),{method:'PATCH',body:JSON.stringify({total,updated_at:new Date().toISOString()})});
   }
-  await sb('/rest/v1/order_items',{method:'POST',body:JSON.stringify(items.map(p=>({order_id:order.id,part_id:p.id,name:p.name,quantity:1,unit_price:Number(p.price)})))});
+  await sb('/rest/v1/order_items',{method:'POST',body:JSON.stringify(items.map(p=>({order_id:order.id,part_id:p.id,name:p.name,quantity:Number(p.quantity||1),unit_price:Number(p.price)})))});
   const razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
   const rp=await razorpay.orders.create({amount,currency:'INR',receipt:'parts_'+order.id.slice(0,12),notes:{project_id,student_id:user.id,business_order_id:order.id}});
   await sb('/rest/v1/orders?id=eq.'+encodeURIComponent(order.id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({razorpay_order_id:rp.id,updated_at:new Date().toISOString()})});
